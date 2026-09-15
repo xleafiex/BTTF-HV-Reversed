@@ -1,0 +1,111 @@
+--- a/vendor/librw/src/gl/gl3raster.cpp
++++ b/vendor/librw/src/gl/gl3raster.cpp
+@@ -31,17 +31,29 @@
+ 	int h = raster->originalHeight;
+ 	int s = raster->originalStride;
+ 	int minDim = 1;
++	int blockBytes = 0;
+ 
+ #ifdef RW_OPENGL
+ 	switch(natras->internalFormat){
+ 	case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
+ 	case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
++		blockBytes = 8;
++		break;
+ 	case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
+ 	case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
+-		minDim = 4;
++		blockBytes = 16;
+ 		break;
+ 	}
+ #endif
++	// DXT mip levels occupy whole 4x4 blocks, including 6x6, 3x3 and 1x1.
++	// Dividing the base stride underallocates non-power-of-two textures.
++	if(blockBytes){
++		for(i = 0; i < level; i++){
++			if(w > 1) w /= 2;
++			if(h > 1) h /= 2;
++		}
++		return ((w+3)/4)*((h+3)/4)*blockBytes;
++	}
+ 
+ 	for(i = 0; i < level; i++){
+ 		if(w > minDim){
+--- a/vendor/librw/src/d3d/d3d.cpp
++++ b/vendor/librw/src/d3d/d3d.cpp
+@@ -863,9 +863,11 @@
+ 			if((raster->format & 0xF00) == Raster::C565)
+ 				image->removeMask();
+ 			break;
++		case D3DFMT_DXT2:
+ 		case D3DFMT_DXT3:
+ 			image->setPixelsDXT(3, pix);
+ 			break;
++		case D3DFMT_DXT4:
+ 		case D3DFMT_DXT5:
+ 			image->setPixelsDXT(5, pix);
+ 			break;
+@@ -874,6 +876,16 @@
+ 			if(unlock)
+ 				raster->unlock(0);
+ 			return nil;
++		}
++		// DXT2/4 store premultiplied colors; RenderWare materials blend straight alpha.
++		if(natras->format == D3DFMT_DXT2 || natras->format == D3DFMT_DXT4){
++			for(int y = 0; y < h; y++) for(int x = 0; x < w; x++){
++				uint8 *p = image->pixels + y*image->stride + x*4;
++				for(int c = 0; c < 3; c++){
++					uint32 value = p[3] ? uint32(p[c])*255/p[3] : 0;
++					p[c] = value > 255 ? 255 : value;
++				}
++			}
+ 		}
+ 		// fix it up again
+ 		image->width = raster->width;
+--- a/vendor/librw/src/raster.cpp
++++ b/vendor/librw/src/raster.cpp
+@@ -532,6 +532,7 @@
+ 	// fall back to going through Image directly
+ 	int32 width, height, depth, format;
+ 	Image *img = ras->toImage();
++	if(img == nil) return nil;
+ 	// TODO: maybe don't *always* do this?
+ 	img->unpalettize();
+ 	Raster::imageFindRasterFormat(img, Raster::TEXTURE, &width, &height, &depth, &format);
+@@ -549,6 +550,7 @@
+ 		newras->setFromImage(img);
+ 		newras->unlock(i);
+ 		ras->unlock(i);
++		img->destroy();
+ 	}
+ 	ras->destroy();
+ 	ras = newras;
+--- a/vendor/librw/src/gl/rwgl3.h
++++ b/vendor/librw/src/gl/rwgl3.h
+@@ -172,6 +172,7 @@
+ extern const char *header_frag_src;
+ 
+ extern Shader *im2dOverrideShader;
++extern Shader *im3dOverrideShader;
+ 
+ // per Scene
+ void setProjectionMatrix(float32*);
+--- a/vendor/librw/src/gl/gl3immed.cpp
++++ b/vendor/librw/src/gl/gl3immed.cpp
+@@ -191,6 +191,7 @@
+ 
+ 
+ static Shader *im3dShader;
++Shader *im3dOverrideShader;
+ static AttribDesc im3dattribDesc[3] = {
+ 	{ ATTRIB_POS,        GL_FLOAT,         GL_FALSE, 3,
+ 		sizeof(Im3DVertex), 0 },
+@@ -251,7 +252,7 @@
+ 		world = &ident;
+ 	}
+ 	setWorldMatrix(world);
+-	im3dShader->use();
++	(im3dOverrideShader ? im3dOverrideShader : im3dShader)->use();
+ 
+ 	if((flags & im3d::VERTEXUV) == 0)
+ 		SetRenderStatePtr(TEXTURERASTER, nil);

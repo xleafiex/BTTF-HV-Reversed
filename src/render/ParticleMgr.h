@@ -130,9 +130,10 @@ public:
 
 	void Initialise();
 	void LoadParticleData();
+	bool LoadAdditional(const char *path);
 	void RangeCheck(tParticleSystemData *pData) { }
 };
 
-VALIDATE_SIZE(cParticleSystemMgr, 0x2FFC);
+// Extended with isolated Leaf particle slots.
 
 extern cParticleSystemMgr mod_ParticleSystemManager;

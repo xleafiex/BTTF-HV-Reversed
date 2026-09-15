@@ -49,6 +49,7 @@ long _dwOperatingSystemVersion;
 #include "AnimViewer.h"
 #include "Font.h"
 #include "MemoryMgr.h"
+#include "LeafMods.h"
 
 // We found out that GLFW's keyboard input handling is still pretty delayed/not stable, so now we fetch input from X11 directly on Linux.
 #if !defined _WIN32 && !defined __APPLE__ && !defined __SWITCH__ // && !defined WAYLAND
@@ -74,6 +75,14 @@ rw::EngineOpenParams openParams;
 static RwBool		  ForegroundApp = TRUE;
 static RwBool		  WindowIconified = FALSE;
 static RwBool		  WindowFocused = TRUE;
+
+#ifdef _WIN32
+static bool SwitchingFullscreenMode = false;
+static bool FullscreenEnterConsumed[2] = { false, false };
+static GLFWmonitor *LastExclusiveMonitor = nil;
+static int LastExclusiveWidth = 0, LastExclusiveHeight = 0;
+static int LastExclusiveRefresh = GLFW_DONT_CARE;
+#endif
 
 static RwBool		  RwInitialised = FALSE;
 
@@ -968,13 +977,10 @@ void _InputShutdownMouse()
 bool _InputMouseNeedsExclusive()
 {
 	// That was the cause of infamous mouse bug on Win.
-	
-	RwVideoMode vm;
-	RwEngineGetVideoModeInfo(&vm, GcurSelVM);
 
 	// If windowed, free the cursor on menu(where this func. is called and DISABLED-HIDDEN transition is done accordingly)
 	// If it's fullscreen, be sure that it didn't stuck on HIDDEN.
-	return !(vm.flags & rwVIDEOMODEEXCLUSIVE) || lastCursorMode == GLFW_CURSOR_HIDDEN;
+	return glfwGetWindowMonitor(PSGLOBAL(window)) == nil || lastCursorMode == GLFW_CURSOR_HIDDEN;
 }
 
 void psPostRWinit(void)
@@ -1162,11 +1168,11 @@ void InitialiseLanguage()
 #else
 	WORD primUserLCID	= PRIMARYLANGID(GetSystemDefaultLCID());
 	WORD primSystemLCID = PRIMARYLANGID(GetUserDefaultLCID());
-	WORD primLayout		= PRIMARYLANGID((DWORD)GetKeyboardLayout(0));
+	WORD primLayout		= PRIMARYLANGID((DWORD)(ULONG_PTR)GetKeyboardLayout(0));
 	
 	WORD subUserLCID	= SUBLANGID(GetSystemDefaultLCID());
 	WORD subSystemLCID	= SUBLANGID(GetUserDefaultLCID());
-	WORD subLayout		= SUBLANGID((DWORD)GetKeyboardLayout(0));
+	WORD subLayout		= SUBLANGID((DWORD)(ULONG_PTR)GetKeyboardLayout(0));
 #endif
 	if (   primUserLCID	  == LANG_GERMAN
 		|| primSystemLCID == LANG_GERMAN
@@ -1316,7 +1322,11 @@ void resizeCB(GLFWwindow* window, int width, int height) {
 	*/
 	/* redraw window */
 
-	if (RwInitialised && gGameState == GS_PLAYING_GAME)
+	if (RwInitialised && gGameState == GS_PLAYING_GAME
+#ifdef _WIN32
+		&& !SwitchingFullscreenMode
+#endif
+	)
 	{
 		RsEventHandler(rsIDLE, (void *)TRUE);
 	}
@@ -1479,6 +1489,84 @@ initkeymap(void)
 void
 keypressCB(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+#ifdef _WIN32
+	// Consume the complete chord, including repeats and a release after Alt is up.
+	if (key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER) {
+		const int enter = key == GLFW_KEY_ENTER ? 0 : 1;
+		if (FullscreenEnterConsumed[enter]) {
+			if (action == GLFW_RELEASE)
+				FullscreenEnterConsumed[enter] = false;
+			return;
+		}
+		if (action == GLFW_PRESS && (mods & GLFW_MOD_ALT)) {
+			FullscreenEnterConsumed[enter] = true;
+			GLFWmonitor *monitor = glfwGetWindowMonitor(window);
+			const bool wasExclusive = monitor != nil;
+			if (!monitor) {
+				// Choose the monitor containing most of this window, including displays
+				// with negative desktop coordinates and monitors above the primary one.
+				int x, y, width, height, count;
+				glfwGetWindowPos(window, &x, &y);
+				glfwGetWindowSize(window, &width, &height);
+				GLFWmonitor **monitors = glfwGetMonitors(&count);
+				int64 bestArea = -1;
+				monitor = glfwGetPrimaryMonitor();
+				for (int i = 0; i < count; i++) {
+					int mx, my;
+					glfwGetMonitorPos(monitors[i], &mx, &my);
+					const GLFWvidmode *mode = glfwGetVideoMode(monitors[i]);
+					if (!mode) continue;
+					const int overlapWidth = Max(0, Min(x + width, mx + mode->width) - Max(x, mx));
+					const int overlapHeight = Max(0, Min(y + height, my + mode->height) - Max(y, my));
+					const int64 area = (int64)overlapWidth * overlapHeight;
+					if (area > bestArea) {
+						bestArea = area;
+						monitor = monitors[i];
+					}
+				}
+			}
+			const GLFWvidmode *mode = monitor ? glfwGetVideoMode(monitor) : nil;
+			if (!mode) return;
+			// A GLFW monitor switch retains the window and its OpenGL context.
+			SwitchingFullscreenMode = true;
+			if (wasExclusive) {
+				LastExclusiveMonitor = monitor;
+				LastExclusiveWidth = mode->width;
+				LastExclusiveHeight = mode->height;
+				LastExclusiveRefresh = mode->refreshRate;
+				int x, y;
+				glfwGetMonitorPos(monitor, &x, &y);
+				glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
+				glfwSetWindowAttrib(window, GLFW_RESIZABLE, GLFW_FALSE);
+				glfwSetWindowMonitor(window, nil, x, y, mode->width, mode->height, GLFW_DONT_CARE);
+				// Detaching restores the desktop video mode. Query it again so a
+				// lower-resolution exclusive mode cannot leave gaps around the window.
+				mode = glfwGetVideoMode(monitor);
+				if (mode) {
+					glfwGetMonitorPos(monitor, &x, &y);
+					glfwSetWindowPos(window, x, y);
+					glfwSetWindowSize(window, mode->width, mode->height);
+				}
+			} else {
+				const bool restore = monitor == LastExclusiveMonitor && LastExclusiveWidth > 0 && LastExclusiveHeight > 0;
+				glfwSetWindowMonitor(window, monitor, 0, 0,
+					restore ? LastExclusiveWidth : mode->width,
+					restore ? LastExclusiveHeight : mode->height,
+					restore ? LastExclusiveRefresh : mode->refreshRate);
+			}
+			PSGLOBAL(fullScreen) = glfwGetWindowMonitor(window) != nil;
+#ifdef IMPROVED_VIDEOMODE
+			FrontEndMenuManager.m_nPrefsWindowed = PSGLOBAL(fullScreen) ? 0 : 1;
+			FrontEndMenuManager.m_nSelectedScreenMode = FrontEndMenuManager.m_nPrefsWindowed;
+#endif
+			int framebufferWidth, framebufferHeight;
+			glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+			resizeCB(window, framebufferWidth, framebufferHeight);
+			SwitchingFullscreenMode = false;
+			return;
+		}
+	}
+#endif
 	if (key >= 0 && key <= GLFW_KEY_LAST && action != GLFW_REPEAT) {
 		RsKeyCodes ks = (RsKeyCodes)keymap[key];
 
@@ -2151,8 +2239,17 @@ main(int argc, char *argv[])
 #ifdef PS2_MENU
 						gGameState = GS_INIT_PLAYING_GAME;
 #else
-						gGameState = GS_INIT_FRONTEND;
-						TRACE("gGameState = GS_INIT_FRONTEND;");
+						// GL3 owns its own state machine and never enters TheGame(), so
+						// perform the removable debug leaf's auto-start decision here.
+						if (LeafMods::DebugPackagePresent()) {
+							FrontEndMenuManager.m_bFirstTime = false;
+							FrontEndMenuManager.m_bMenuActive = false;
+							gGameState = GS_INIT_PLAYING_GAME;
+							TRACE("debug.leaf: gGameState = GS_INIT_PLAYING_GAME;");
+						} else {
+							gGameState = GS_INIT_FRONTEND;
+							TRACE("gGameState = GS_INIT_FRONTEND;");
+						}
 #endif
 						break;
 					}

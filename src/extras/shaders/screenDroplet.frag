@@ -11,7 +11,8 @@ main(void)
 {
 	vec4 color;
 	color = v_color*texture(tex0, vec2(v_tex0.x, 1.0-v_tex0.y));
-	color *= texture(tex1, vec2(v_tex1.x, 1.0-v_tex1.y));
+	// Scene alpha is not droplet coverage (it may be zero after post effects).
+	color.rgb *= texture(tex1, vec2(v_tex1.x, 1.0-v_tex1.y)).rgb;
 
 	FRAGCOLOR(color);
 }

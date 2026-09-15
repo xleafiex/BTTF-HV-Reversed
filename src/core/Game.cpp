@@ -92,12 +92,19 @@
 #include "custompipes.h"
 #include "screendroplets.h"
 #include "VarConsole.h"
+#include "LeafMods.h"
 #ifdef USE_TEXTURE_POOL
 #include "TexturePools.h"
 #endif
 
 eLevelName CGame::currLevel;
 int32 CGame::currArea;
+bool CGame::scmEnabled = true;
+
+void CGame::SetScmEnabled(bool enabled)
+{
+	scmEnabled = enabled;
+}
 bool CGame::bDemoMode = true;
 bool CGame::nastyGame = true;
 bool CGame::frenchGame;
@@ -350,6 +357,7 @@ bool CGame::InitialiseOnceAfterRW(void)
 void
 CGame::FinalShutdown(void)
 {	
+	LeafMods::Shutdown();
 	CTxdStore::Shutdown();
 	CPedStats::Shutdown();
 	CdStreamShutdown();
@@ -550,7 +558,8 @@ bool CGame::Initialise(const char* datFile)
 #endif
 	{
 		CTheScripts::StartTestScript();
-		CTheScripts::Process();
+		if (scmEnabled)
+			CTheScripts::Process();
 		TheCamera.Process();
 	}
 
@@ -573,11 +582,14 @@ bool CGame::Initialise(const char* datFile)
 
 	DMAudio.SetStartingTrackPositions(true);
 	DMAudio.ChangeMusicMode(MUSICMODE_GAME);
+	LeafMods::Initialise();
 	return true;
 }
 
 bool CGame::ShutDown(void)
 {
+	// Native packages must release vehicle references before the world and pools.
+	LeafMods::Shutdown();
 #ifdef USE_TEXTURE_POOL
 	_TexturePoolsUnknown(false);
 #endif
@@ -709,7 +721,8 @@ void CGame::ReInitGameObjectVariables(void)
 	{
 		CCranes::InitCranes();
 		CTheScripts::StartTestScript();
-		CTheScripts::Process();
+		if (scmEnabled)
+			CTheScripts::Process();
 		TheCamera.Process();
 		CTrain::InitTrains();
 		CPlane::InitPlanes();
@@ -856,6 +869,10 @@ void CGame::Process(void)
 	CStreaming::Update();
 	uint32 processTime = CTimer::GetCurrentTimeInCycles() / CTimer::GetCyclesPerMillisecond() - startTime;
 	CWindModifiers::Number = 0;
+	// Let removable modules pause their independent audio/resources. Each
+	// installed module returns before simulation work while the timer is paused.
+	if (CTimer::GetIsPaused())
+		LeafMods::Update();
 	if (!CTimer::GetIsPaused())
 	{
 #ifndef MASTER
@@ -874,7 +891,8 @@ void CGame::Process(void)
 		CWeather::Update();
 
 		PUSH_MEMID(MEMID_SCRIPT);
-		CTheScripts::Process();
+		if (scmEnabled)
+			CTheScripts::Process();
 		POP_MEMID();
 
 		CCollision::Update();
@@ -914,6 +932,7 @@ void CGame::Process(void)
 		PUSH_MEMID(MEMID_WORLD);
 		CWorld::Process();
 		POP_MEMID();
+		LeafMods::Update();
 
 		gAccidentManager.Update();
 		CPacManPickups::Update();

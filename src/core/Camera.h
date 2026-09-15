@@ -536,6 +536,8 @@ public:
 	uint32 m_uiFadeTimeStartedMusic;
 
 	static bool m_bUseMouse3rdPerson;
+	static bool bLeafFirstPerson;
+	static float bLeafFirstPersonBodyAlpha;
 #ifdef FREE_CAM
 	static bool bFreeCam;
 #endif

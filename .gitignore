@@ -359,4 +359,11 @@ codewarrior/reVC_Data/
 codewarrior/Release/
 codewarrior/Debug/
 
+# Miami native build and packaging output
+build-mingw/
+work/
+re3/
+leaf-modules/__pycache__/
+leaf-modules/*/__pycache__/
+
 src/extras/GitSHA1.cpp

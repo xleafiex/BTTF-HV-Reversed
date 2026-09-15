@@ -305,7 +305,12 @@ void _rwD3D8TexDictionaryEnableRasterFormatConversion(bool enable) { }
 RwBool rwNativeTextureHackRead(RwStream *stream, RwTexture **tex, RwInt32 size)
 {
 	*tex = Texture::streamReadNative(stream);
+	if(*tex == nil || (*tex)->raster == nil) return false;
 #ifdef LIBRW
+	if(getenv("LEAF_TRACE_TEXTURES")){
+		FILE *trace = fopen("leaf-textures.log", "a");
+		if(trace){ fprintf(trace, "%s %d %d\n", (*tex)->name, (*tex)->raster->width, (*tex)->raster->height); fclose(trace); }
+	}
 	(*tex)->raster = rw::Raster::convertTexToCurrentPlatform((*tex)->raster);
 #endif
 	return *tex != nil;

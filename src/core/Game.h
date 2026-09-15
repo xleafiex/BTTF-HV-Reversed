@@ -46,6 +46,7 @@ public:
 #endif
 	static bool noProstitutes;
 	static bool playingIntro;
+	static bool scmEnabled;
 	static char aDatFile[32];
 
 #ifndef MASTER
@@ -65,6 +66,8 @@ public:
 	static void ShutDownForRestart(void);
 	static void InitialiseWhenRestarting(void);
 	static void Process(void);
+	static void SetScmEnabled(bool enabled);
+	static bool IsScmEnabled(void) { return scmEnabled; }
 
 	static void InitAfterFocusLoss(void);
 

@@ -58,6 +58,8 @@ public:
 	static void ReloadConfig();
 	static void Initialise();
 	static void Shutdown();
+	static bool LoadLeafDebrisTextures(const char *txdPath);
+	static void UnloadLeafDebrisTextures();
 	
 	static void AddParticlesAlongLine(tParticleType type, CVector const &vecStart, CVector const &vecEnd, CVector const &vecDir, float fPower, CEntity *pEntity = nil, float fSize = 0.0f,                     int32 nRotationSpeed = 0, int32 nRotation = 0, int32 nCurFrame = 0, int32 nLifeSpan = 0);	
 	static void AddParticlesAlongLine(tParticleType type, CVector const &vecStart, CVector const &vecEnd, CVector const &vecDir, float fPower, CEntity *pEntity,       float fSize, RwRGBA const&color,        int32 nRotationSpeed = 0, int32 nRotation = 0, int32 nCurFrame = 0, int32 nLifeSpan = 0);

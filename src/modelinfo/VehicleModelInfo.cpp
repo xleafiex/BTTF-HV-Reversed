@@ -20,6 +20,7 @@
 #include "ModelIndices.h"
 #include "ModelInfo.h"
 #include "custompipes.h"
+#include "LeafMods.h"
 
 int8 CVehicleModelInfo::ms_compsToUse[2] = { -2, -2 };
 int8 CVehicleModelInfo::ms_compsUsed[2];
@@ -530,6 +531,9 @@ GetOkAndDamagedAtomicCB(RwObject *object, void *data)
 void
 CVehicleModelInfo::PreprocessHierarchy(void)
 {
+	int modelId = -1;
+	CModelInfo::GetModelInfo(GetModelName(), &modelId);
+	const bool preserve = LeafMods::PreserveVehicleFrames(modelId);
 	int32 i;
 	RwObjectNameIdAssocation *desc;
 	RwFrame *f;
@@ -561,7 +565,7 @@ CVehicleModelInfo::PreprocessHierarchy(void)
 			*rwvec = *RwMatrixGetPos(RwFrameGetMatrix(f));
 			for(f = RwFrameGetParent(f); f; f = RwFrameGetParent(f))
 				RwV3dTransformPoints(rwvec, rwvec, 1, RwFrameGetMatrix(f));
-			RwFrameDestroy(assoc.frame);
+			if (!preserve) RwFrameDestroy(assoc.frame);
 		}else{
 			atomic = (RpAtomic*)GetFirstObject(assoc.frame);
 			RpClumpRemoveAtomic(m_clump, atomic);
@@ -586,7 +590,7 @@ CVehicleModelInfo::PreprocessHierarchy(void)
 		if(desc[i].flags & VEHICLE_FLAG_DOOR)
 			m_numDoors++;
 
-		if(desc[i].flags & VEHICLE_FLAG_COLLAPSE){
+		if(!preserve && (desc[i].flags & VEHICLE_FLAG_COLLAPSE)){
 			RpAtomic *okdam[2] = { nil, nil };
 			RwFrameForAllChildren(assoc.frame, CollapseFramesCB, assoc.frame);
 			RwFrameUpdateObjects(assoc.frame);
@@ -597,7 +601,7 @@ CVehicleModelInfo::PreprocessHierarchy(void)
 
 		SetVehicleComponentFlags(assoc.frame, desc[i].flags);
 
-		if(desc[i].flags & VEHICLE_FLAG_ADD_WHEEL){
+		if(!preserve && (desc[i].flags & VEHICLE_FLAG_ADD_WHEEL)){
 			if(m_wheelId == -1)
 				RwFrameDestroy(assoc.frame);
 			else{
@@ -813,10 +817,12 @@ CVehicleModelInfo::GetEditableMaterialListCB(RpMaterial *material, void *data)
 	cbdata = (editableMatCBData*)data;
 	col = RpMaterialGetColor(material);
 	if(col->red == 0x3C && col->green == 0xFF && col->blue == 0){
-		cbdata->vehicle->m_materials1[cbdata->numMats1++] = material;
+		if (cbdata->numMats1 < NUM_FIRST_MATERIALS - 1)
+			cbdata->vehicle->m_materials1[cbdata->numMats1++] = material;
 		RpMaterialSetColor(material, &white);
 	}else if(col->red == 0xFF && col->green == 0 && col->blue == 0xAF){
-		cbdata->vehicle->m_materials2[cbdata->numMats2++] = material;
+		if (cbdata->numMats2 < NUM_SECOND_MATERIALS - 1)
+			cbdata->vehicle->m_materials2[cbdata->numMats2++] = material;
 		RpMaterialSetColor(material, &white);
 	}
 	return material;

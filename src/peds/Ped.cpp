@@ -1,4 +1,27 @@
 #include "common.h"
+#include "LeafMods.h"
+#include "Camera.h"
+#include <vector>
+
+static RpMaterial *LeafBodyAlphaMaterial(RpMaterial *material, void *data) {
+	float alpha = *(float*)data;
+	RwRGBA color = *RpMaterialGetColor(material);
+	color.alpha = (uint8)clamp(alpha * 255.0f, 0.0f, 255.0f);
+	RpMaterialSetColor(material, &color);
+	return material;
+}
+struct LeafSavedMaterial { RpMaterial *material; RwRGBA color; };
+static RpMaterial *LeafSaveBodyMaterial(RpMaterial *material, void *data) {
+	std::vector<LeafSavedMaterial> *saved=(std::vector<LeafSavedMaterial>*)data;
+	saved->push_back({material,*RpMaterialGetColor(material)});
+	return LeafBodyAlphaMaterial(material,&CCamera::bLeafFirstPersonBodyAlpha);
+}
+static RpAtomic *LeafApplyBodyAlpha(RpAtomic *atomic, void *data) {
+	RpGeometry *geometry=RpAtomicGetGeometry(atomic);
+	RpGeometrySetFlags(geometry,RpGeometryGetFlags(geometry)|rpGEOMETRYMODULATEMATERIALCOLOR|rpGEOMETRYLIGHT);
+	RpGeometryForAllMaterials(geometry,LeafSaveBodyMaterial,data);
+	return atomic;
+}
 
 #include "main.h"
 #include "Pools.h"
@@ -4964,8 +4987,9 @@ CVector vecTestTemp(-1.0f, -1.0f, -1.0f);
 void
 CPed::Render(void)
 {
+	const bool firstPersonBody = CCamera::bLeafFirstPerson && this == FindPlayerPed();
 	if (bInVehicle && m_pMyVehicle && m_nPedState != PED_EXIT_CAR && m_nPedState != PED_DRAG_FROM_CAR) {
-		if (!bRenderPedInCar)
+		if (!bRenderPedInCar && !firstPersonBody)
 			return;
 
 		if (!m_pMyVehicle->IsBike() && !IsPlayer()) {
@@ -4975,7 +4999,54 @@ CPed::Render(void)
 		}
 	}
 
+	// Use the same head-bone scale as the shot-off-head effect, but only
+	// for this draw. Restore it before anything queries the animated pose
+	// again, particularly the head camera. No damage/bleeding state changes.
+	RwMatrix *hiddenHead = nil;
+	std::vector<LeafSavedMaterial> savedMaterials;
+	void *savedAlphaBlend=nil,*savedSrc=nil,*savedDst=nil;
+	RwMatrix *poseMatrices = nil;
+	std::vector<RwMatrix> savedPose;
+	if(m_rwObject && LeafMods::PedPose(this,false)) {
+		RpHAnimHierarchy *hier=GetAnimHierarchyFromSkinClump(GetClump());
+		if(hier && hier->numNodes>0) {
+			poseMatrices=RpHAnimHierarchyGetMatrixArray(hier);
+			savedPose.assign(poseMatrices,poseMatrices+hier->numNodes);
+			LeafMods::PedPose(this,true);
+		}
+	}
+	RwMatrix savedHead;
+	if (firstPersonBody && m_rwObject) {
+		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(GetClump());
+		if (hier) {
+			const int32 idx = RpHAnimIDGetIndex(hier, ConvertPedNode2BoneTag(PED_HEAD));
+			if (idx >= 0 && idx < hier->numNodes) {
+				hiddenHead = &RpHAnimHierarchyGetMatrixArray(hier)[idx];
+				savedHead = *hiddenHead;
+				RwV3d zero = { 0.0f, 0.0f, 0.0f };
+				RwMatrixScale(hiddenHead, &zero, rwCOMBINEPRECONCAT);
+			}
+		}
+	}
+	if (firstPersonBody && CCamera::bLeafFirstPersonBodyAlpha < .999f)
+	{
+		RpClumpForAllAtomics((RpClump*)m_rwObject,LeafApplyBodyAlpha,&savedMaterials);
+		RwRenderStateGet(rwRENDERSTATEVERTEXALPHAENABLE,&savedAlphaBlend);
+		RwRenderStateGet(rwRENDERSTATESRCBLEND,&savedSrc);
+		RwRenderStateGet(rwRENDERSTATEDESTBLEND,&savedDst);
+		RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE,(void*)TRUE);
+		RwRenderStateSet(rwRENDERSTATESRCBLEND,(void*)rwBLENDSRCALPHA);
+		RwRenderStateSet(rwRENDERSTATEDESTBLEND,(void*)rwBLENDINVSRCALPHA);
+	}
 	CEntity::Render();
+	if (hiddenHead) *hiddenHead = savedHead;
+	if (poseMatrices) std::copy(savedPose.begin(),savedPose.end(),poseMatrices);
+	for(auto &entry:savedMaterials)RpMaterialSetColor(entry.material,&entry.color);
+	if(!savedMaterials.empty()){
+		RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE,savedAlphaBlend);
+		RwRenderStateSet(rwRENDERSTATESRCBLEND,savedSrc);
+		RwRenderStateSet(rwRENDERSTATEDESTBLEND,savedDst);
+	}
 
 	if(m_pWeaponModel){
 		RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(GetClump());

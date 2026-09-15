@@ -966,6 +966,12 @@ void
 CBrightLights::RegisterOne(CVector pos, CVector up, CVector side, CVector front,
 	uint8 type, uint8 red, uint8 green, uint8 blue)
 {
+	// These vehicle types draw untextured cubes around the lamp dummies.
+	// Keep the separately registered coronas and road illumination instead.
+	// Traffic lamps and sirens still use this geometry pass.
+	if(type >= BRIGHTLIGHT_FRONT_LONG && type <= BRIGHTLIGHT_REAR_TALL)
+		return;
+
 	if(NumBrightLights >= NUMBRIGHTLIGHTS)
 		return;
 

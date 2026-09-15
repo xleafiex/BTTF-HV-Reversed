@@ -1,6 +1,7 @@
 #include "common.h"
 
 #include "Script.h"
+#include "LeafMods.h"
 #include "ScriptCommands.h"
 
 #include "AnimBlendAssociation.h"
@@ -2251,6 +2252,7 @@ void CTheScripts::Init()
 #endif
 	CFileMgr::Read(mainf, (char*)ScriptSpace, SIZE_MAIN_SCRIPT);
 	CFileMgr::CloseFile(mainf);
+    LeafMods::LoadDebugScript(ScriptSpace, SIZE_MAIN_SCRIPT);
 	CFileMgr::SetDir("");
 	StoreVehicleIndex = -1;
 	StoreVehicleWasRandom = true;

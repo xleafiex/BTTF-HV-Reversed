@@ -75,6 +75,8 @@
 #include "custompipes.h"
 #include "screendroplets.h"
 #include "VarConsole.h"
+#include "LeafMods.h"
+#include "leaf_api.h"
 #ifdef USE_OUR_VERSIONING
 #include "GitSHA1.h"
 #endif
@@ -1229,7 +1231,9 @@ MattRenderScene(void)
 	/// CRenderer::ClearForFrame();		// before ConstructRenderList
 	// CClock::CalcEnvMapTimeMultiplicator
 	RwRenderStateSet(rwRENDERSTATECULLMODE, (void*)rwCULLMODECULLNONE);
+	LeafMods::RenderPass(1);
 	CWaterLevel::RenderWater();	// actually CMattRenderer::RenderWater
+	LeafMods::RenderPass(2);
 	// CClock::ms_EnvMapTimeMultiplicator = 1.0f;
 	// cWorldStream::ClearDynamics
 	/// CRenderer::ConstructRenderList();	// before PreRender
@@ -1244,6 +1248,7 @@ if(gbRenderRoads)
 	CRenderer::RenderRoads();
 
 	CRenderer::RenderPeds();
+	LeafMods::RenderPass(LEAF_BEFORE_VEHICLES);
 
 	// not sure where to put these since LCS has no underwater entities
 if(gbRenderBoats)
@@ -1251,8 +1256,11 @@ if(gbRenderBoats)
 if(gbRenderFadingInUnderwaterEntities)
 	CRenderer::RenderFadingInUnderwaterEntities();
 	RwRenderStateSet(rwRENDERSTATECULLMODE, (void*)rwCULLMODECULLNONE);
-if(gbRenderWater)
+if(gbRenderWater) {
+	LeafMods::RenderPass(1);
 	CRenderer::RenderTransparentWater();
+	LeafMods::RenderPass(2);
+}
 
 if(gbRenderEverythingBarRoads)
 	CRenderer::RenderEverythingBarRoads();
@@ -1265,8 +1273,11 @@ void
 RenderScene_new(void)
 {
 	PUSH_RENDERGROUP("RenderScene_new");
-	CClouds::Render();
-	DoRWRenderHorizon();
+	if(!LeafMods::RenderPass(0)) {
+		CClouds::Render();
+		DoRWRenderHorizon();
+	}
+	LeafMods::RenderPass(LEAF_BACKGROUND_EFFECTS);
 
 	MattRenderScene();
 	DefinedState();
@@ -1339,21 +1350,30 @@ RenderScene(void)
 	}
 #endif
 	PUSH_RENDERGROUP("RenderScene");
-	CClouds::Render();
-	DoRWRenderHorizon();
+	if(!LeafMods::RenderPass(0)) {
+		CClouds::Render();
+		DoRWRenderHorizon();
+	}
+	LeafMods::RenderPass(LEAF_BACKGROUND_EFFECTS);
 	CRenderer::RenderRoads();
 	CCoronas::RenderReflections();
 	CRenderer::RenderEverythingBarRoads();
 	RwRenderStateSet(rwRENDERSTATECULLMODE, (void*)rwCULLMODECULLNONE);
+	LeafMods::RenderPass(1);
 	CWaterLevel::RenderWater();
+	LeafMods::RenderPass(2);
+	LeafMods::RenderPass(LEAF_BEFORE_VEHICLES);
 	CRenderer::RenderBoats();
 	CRenderer::RenderFadingInUnderwaterEntities();
 	RwRenderStateSet(rwRENDERSTATECULLMODE, (void*)rwCULLMODECULLNONE);
+	LeafMods::RenderPass(1);
 	CWaterLevel::RenderTransparentWater();
+	LeafMods::RenderPass(2);
 	CRenderer::RenderFadingInEntities();
 	RwRenderStateSet(rwRENDERSTATECULLMODE, (void*)rwCULLMODECULLNONE);
 	CWeather::RenderRainStreaks();
 	CCoronas::RenderSunReflection();
+	LeafMods::RenderPass(3);
 	POP_RENDERGROUP();
 }
 
@@ -1378,6 +1398,7 @@ RenderEffects(void)
 #ifdef NEW_RENDERER
 	if(gbNewRenderer){
 		RenderEffects_new();
+		LeafMods::RenderPass(3);
 		return;
 	}
 #endif
@@ -1463,6 +1484,7 @@ Render2dStuff(void)
 		CHud::Draw();
 
 	CSpecialFX::Render2DFXs();
+	LeafMods::Draw();
 	CUserDisplay::OnscnTimer.ProcessForDisplay();
 	CMessages::Display();
 	CDarkel::DrawMessages();
@@ -1576,6 +1598,7 @@ Idle(void *arg)
 
 		tbStartTimer(0, "PreRender");
 		CRenderer::PreRender();
+		LeafMods::RenderPass(LEAF_PRE_RENDER);
 		tbEndTimer("PreRender");
 
 #ifdef FIX_BUGS
@@ -1843,6 +1866,9 @@ void TheGame(void)
 	Const char *splash = GetRandomSplashScreen(); // inlined here
 
 	LoadingScreen("Starting Game", NULL, splash);
+	// The removable debug package can skip the front end for rapid testing.
+	// This host-side latch survives the package unload that occurs on restart.
+	bool autoStartDebug = LeafMods::DebugPackagePresent();
 
 #ifdef GTA_PS2
 	// TODO(MIAMI): not checked yet
@@ -1876,6 +1902,10 @@ void TheGame(void)
 		}
 
 		WANT_TO_LOAD = false;
+		if (autoStartDebug) {
+			autoStartDebug = false;
+			FrontEndMenuManager.m_bWantToRestart = true;
+		}
 
 		CTimer::Update();
 
@@ -1910,6 +1940,7 @@ void TheGame(void)
 			if ((!FrontEndMenuManager.m_bMenuActive || FrontEndMenuManager.m_bRenderGameInMenu == true) && TheCamera.GetScreenFadeStatus() != FADE_2 )
 			{
 				CRenderer::PreRender();
+				LeafMods::RenderPass(LEAF_PRE_RENDER);
 				// TODO(MIAMI): something ps2all specific
 
 #ifdef FIX_BUGS

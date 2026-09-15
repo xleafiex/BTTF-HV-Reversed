@@ -197,6 +197,8 @@ void
 ScreenDroplets::Render(void)
 {
 	ScreenDrop *drop;
+	if(!ms_initialised || !ms_maskTex || !CPostFX::pBackBuffer || !ms_numDrops)
+		return;
 
 	DefinedState();
 	RwRenderStateSet(rwRENDERSTATETEXTURERASTER, RwTextureGetRaster(ms_maskTex));
@@ -204,6 +206,8 @@ ScreenDroplets::Render(void)
 	RwRenderStateSet(rwRENDERSTATEZTESTENABLE, FALSE);
 	RwRenderStateSet(rwRENDERSTATEZWRITEENABLE, FALSE);
 	RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, (void*)TRUE);
+	RwRenderStateSet(rwRENDERSTATESRCBLEND, (void*)rwBLENDSRCALPHA);
+	RwRenderStateSet(rwRENDERSTATEDESTBLEND, (void*)rwBLENDINVSRCALPHA);
 
 	RwTextureSetRaster(ms_screenTex, CPostFX::pBackBuffer);
 #ifdef RW_D3D9

@@ -1,4 +1,5 @@
 #include "common.h"
+#include "LeafMods.h"
 
 #include "main.h"
 #include "TxdStore.h"
@@ -174,6 +175,7 @@ CSkidmarks::RegisterOne(uintptr id, const CVector &pos, float fwdX, float fwdY, 
 void
 CSkidmarks::RegisterOne(uintptr id, const CVector &pos, float fwdX, float fwdY, eSkidmarkType type, bool *isBloody)
 {
+	if(LeafMods::SuppressWheelMark(id))return;
 	int i;
 	CVector2D fwd(fwdX, fwdY);
 

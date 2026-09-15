@@ -139,3 +139,33 @@ if(${PROJECT}_INSTALL)
         install(FILES $<TARGET_PDB_FILE:${EXECUTABLE}> DESTINATION "." OPTIONAL)
     endif()
 endif()
+# Embed GL3 shaders at configure time; rerun CMake when a shader changes.
+if(LIBRW_PLATFORM STREQUAL "GL3")
+    file(GLOB REVC_GL_SHADERS CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/extras/shaders/*.vert"
+        "${CMAKE_CURRENT_SOURCE_DIR}/extras/shaders/*.frag")
+    foreach(shader IN LISTS REVC_GL_SHADERS)
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader}")
+        get_filename_component(shader_name "${shader}" NAME)
+        string(REPLACE "." "_" shader_symbol "${shader_name}")
+        file(READ "${shader}" shader_text)
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated/shaders/obj")
+        file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/shaders/obj/${shader_symbol}.inc"
+            "const char *${shader_symbol}_src = R\"REVCGLSL(${shader_text})REVCGLSL\";\n")
+    endforeach()
+    target_include_directories(${EXECUTABLE} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+endif()
+
+if(MINGW)
+    target_link_libraries(${EXECUTABLE} PRIVATE winmm xinput)
+    target_link_options(${EXECUTABLE} PRIVATE
+        "-Wl,--export-all-symbols"
+        "-Wl,--out-implib,${CMAKE_CURRENT_BINARY_DIR}/libreVC.dll.a")
+endif()
+
+
+
+if(WIN32)
+    target_sources(${EXECUTABLE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/leaf/LeafMods.cpp")
+    target_include_directories(${EXECUTABLE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/leaf")
+endif()

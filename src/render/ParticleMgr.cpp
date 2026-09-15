@@ -253,3 +253,194 @@ void cParticleSystemMgr::LoadParticleData()
 		lineEnd++;
 	}
 }
+
+// Separate lists and presets: ordinary VC effects never use these slots.
+bool cParticleSystemMgr::LoadAdditional(const char *path) {
+    FILE *file=fopen(path,"r"); if(!file)return false;
+    for(int i=0;i<PARTICLE_STOCK_COUNT;i++) {
+        auto &dst=m_aParticles[PARTICLE_LEAF_FIRST+i];
+        dst=m_aParticles[i];dst.m_Type=(tParticleType)i;dst.m_pParticles=nil;
+    }
+    char line[1024];int loaded=0;
+    while(fgets(line,sizeof(line),file)) {
+        char *value=strtok(line," \t\r\n");if(!value || value[0]==';')continue;
+        tParticleSystemData *entry=nil;
+        for(int i=0;i<PARTICLE_STOCK_COUNT;i++)if(!strcmp(value,m_aParticles[i].m_aName))entry=&m_aParticles[PARTICLE_LEAF_FIRST+i];
+        if(!entry)continue;
+        int param=CFG_PARAM_FIRST;
+        do {
+				switch ( param )
+				{
+					case CFG_PARAM_PARTICLE_TYPE_NAME: break;
+
+					case CFG_PARAM_RENDER_COLOURING_R:
+						entry->m_RenderColouring.red = atoi(value);
+						break;
+
+					case CFG_PARAM_RENDER_COLOURING_G:
+						entry->m_RenderColouring.green = atoi(value);
+						break;
+
+					case CFG_PARAM_RENDER_COLOURING_B:
+						entry->m_RenderColouring.blue = atoi(value);
+						break;
+
+					case CFG_PARAM_INITIAL_COLOR_VARIATION:
+						entry->m_InitialColorVariation = Min(atoi(value), 100);
+						break;
+
+					case CFG_PARAM_FADE_DESTINATION_COLOR_R:
+						entry->m_FadeDestinationColor.red = atoi(value);
+						break;
+
+					case CFG_PARAM_FADE_DESTINATION_COLOR_G:
+						entry->m_FadeDestinationColor.green = atoi(value);
+						break;
+
+					case CFG_PARAM_FADE_DESTINATION_COLOR_B:
+						entry->m_FadeDestinationColor.blue = atoi(value);
+						break;
+
+					case CFG_PARAM_COLOR_FADE_TIME:
+						entry->m_ColorFadeTime = atoi(value);
+						break;
+
+					case CFG_PARAM_DEFAULT_INITIAL_RADIUS:
+						entry->m_fDefaultInitialRadius = atof(value);
+						break;
+
+					case CFG_PARAM_EXPANSION_RATE:
+						entry->m_fExpansionRate = atof(value);
+						break;
+
+					case CFG_PARAM_INITIAL_INTENSITY:
+						entry->m_nFadeToBlackInitialIntensity = atoi(value);
+						break;
+
+					case CFG_PARAM_FADE_TIME:
+						entry->m_nFadeToBlackTime = atoi(value);
+						break;
+
+					case CFG_PARAM_FADE_AMOUNT:
+						entry->m_nFadeToBlackAmount = atoi(value);
+						break;
+
+					case CFG_PARAM_INITIAL_ALPHA_INTENSITY:
+						entry->m_nFadeAlphaInitialIntensity = atoi(value);
+						break;
+
+					case CFG_PARAM_FADE_ALPHA_TIME:
+						entry->m_nFadeAlphaTime = atoi(value);
+						break;
+
+					case CFG_PARAM_FADE_ALPHA_AMOUNT:
+						entry->m_nFadeAlphaAmount = atoi(value);
+						break;
+
+					case CFG_PARAM_INITIAL_ANGLE:
+						entry->m_nZRotationInitialAngle = atoi(value);
+						break;
+
+					case CFG_PARAM_CHANGE_TIME:
+						entry->m_nZRotationChangeTime = atoi(value);
+						break;
+
+					case CFG_PARAM_ANGLE_CHANGE_AMOUNT:
+						entry->m_nZRotationAngleChangeAmount = atoi(value);
+						break;
+
+					case CFG_PARAM_INITIAL_Z_RADIUS:
+						entry->m_fInitialZRadius = atof(value);
+						break;
+
+					case CFG_PARAM_Z_RADIUS_CHANGE_TIME:
+						entry->m_nZRadiusChangeTime = atoi(value);
+						break;
+
+					case CFG_PARAM_Z_RADIUS_CHANGE_AMOUNT:
+						entry->m_fZRadiusChangeAmount = atof(value);
+						break;
+
+					case CFG_PARAM_ANIMATION_SPEED:
+						entry->m_nAnimationSpeed = atoi(value);
+						break;
+
+					case CFG_PARAM_START_ANIMATION_FRAME:
+						entry->m_nStartAnimationFrame = atoi(value);
+						break;
+
+					case CFG_PARAM_FINAL_ANIMATION_FRAME:
+						entry->m_nFinalAnimationFrame = atoi(value);
+						break;
+
+					case CFG_PARAM_ROTATION_SPEED:
+						entry->m_nRotationSpeed = atoi(value);
+						break;
+
+					case CFG_PARAM_GRAVITATIONAL_ACCELERATION:
+						entry->m_fGravitationalAcceleration = atof(value);
+						break;
+
+					case CFG_PARAM_FRICTION_DECCELERATION:
+						entry->m_nFrictionDecceleration = atoi(value);
+						break;
+
+					case CFG_PARAM_LIFE_SPAN:
+						entry->m_nLifeSpan = atoi(value);
+						break;
+
+					case CFG_PARAM_POSITION_RANDOM_ERROR:
+						entry->m_fPositionRandomError = atof(value);
+						break;
+
+					case CFG_PARAM_VELOCITY_RANDOM_ERROR:
+						entry->m_fVelocityRandomError = atof(value);
+						break;
+
+					case CFG_PARAM_EXPANSION_RATE_ERROR:
+						entry->m_fExpansionRateError = atof(value);
+						break;
+
+					case CFG_PARAM_ROTATION_RATE_ERROR:
+						entry->m_nRotationRateError = atoi(value);
+						break;
+
+					case CFG_PARAM_LIFE_SPAN_ERROR_SHAPE:
+						entry->m_nLifeSpanErrorShape = atoi(value);
+						break;
+
+					case CFG_PARAM_TRAIL_LENGTH_MULTIPLIER:
+						entry->m_fTrailLengthMultiplier = atof(value);
+						break;
+						
+					case CFG_PARAM_STRETCH_VALUE_X:
+						entry->m_vecTextureStretch.x = atof(value);
+						break;
+
+					case CFG_PARAM_STRETCH_VALUE_Y:
+						entry->m_vecTextureStretch.y = atof(value);
+						break;
+
+					case CFG_PARAM_WIND_FACTOR:
+						entry->m_fWindFactor = atof(value);
+						break;
+
+					case CFG_PARAM_PARTICLE_CREATE_RANGE:
+						entry->m_fCreateRange = SQR(atof(value));
+						break;
+
+					case CFG_PARAM_FLAGS:
+						entry->Flags = atoi(value);
+						break;
+				}
+				
+            ++param;value=strtok(nil," \t\r\n");
+        }while(value && param<=CFG_PARAM_LAST);
+        // Raster arrays retain the stock frame count; reject out-of-range animation overrides.
+        const auto &base=m_aParticles[entry-m_aParticles-PARTICLE_LEAF_FIRST];
+        entry->m_nStartAnimationFrame=Min(entry->m_nStartAnimationFrame,base.m_nFinalAnimationFrame);
+        entry->m_nFinalAnimationFrame=Min(entry->m_nFinalAnimationFrame,base.m_nFinalAnimationFrame);
+        ++loaded;
+    }
+    fclose(file);return loaded>0;
+}

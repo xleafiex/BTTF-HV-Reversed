@@ -21,7 +21,7 @@
 #include "soundlist.h"
 
 
-#define MAX_PARTICLES_ON_SCREEN   (750)
+#define MAX_PARTICLES_ON_SCREEN   (1500)
 
 
 //(5)
@@ -226,6 +226,47 @@ RwRaster *gpHeatHazeRaster;
 RwRaster *gpBeastieRaster;
 RwRaster *gpRainDripRaster[MAX_RAINDRIP_FILES];
 RwRaster *gpRainDripDarkRaster[MAX_RAINDRIP_FILES];
+
+static int32 leafDebrisTxd = -1;
+static RwTexture *leafDebrisTextures[3] = {};
+
+bool CParticle::LoadLeafDebrisTextures(const char *txdPath)
+{
+	UnloadLeafDebrisTextures();
+	leafDebrisTxd = CTxdStore::AddTxdSlot("leaf_original_debris");
+	if(leafDebrisTxd < 0 || !CTxdStore::LoadTxd(leafDebrisTxd, txdPath)) return false;
+	CTxdStore::AddRef(leafDebrisTxd);
+	CTxdStore::PushCurrentTxd();
+	CTxdStore::SetCurrentTxd(leafDebrisTxd);
+	leafDebrisTextures[0] = RwTextureRead("gameleaf01_64", nil);
+	leafDebrisTextures[1] = RwTextureRead("letter", nil);
+	leafDebrisTextures[2] = RwTextureRead("newspaper02_64", nil);
+	CTxdStore::PopCurrentTxd();
+	if(!leafDebrisTextures[0] || !leafDebrisTextures[1] || !leafDebrisTextures[2]) {
+		UnloadLeafDebrisTextures();
+		return false;
+	}
+	gpLeafRaster[0] = RwTextureGetRaster(leafDebrisTextures[0]);
+	gpLeafRaster[1] = RwTextureGetRaster(leafDebrisTextures[1]);
+	gpNewspaperRaster = RwTextureGetRaster(leafDebrisTextures[2]);
+	return true;
+}
+
+void CParticle::UnloadLeafDebrisTextures()
+{
+	if(gpLeafTex[0]) gpLeafRaster[0] = RwTextureGetRaster(gpLeafTex[0]);
+	if(gpLeafTex[1]) gpLeafRaster[1] = RwTextureGetRaster(gpLeafTex[1]);
+	if(gpNewspaperTex) gpNewspaperRaster = RwTextureGetRaster(gpNewspaperTex);
+	for(RwTexture *&texture : leafDebrisTextures) {
+		if(texture) RwTextureDestroy(texture);
+		texture = nil;
+	}
+	if(leafDebrisTxd >= 0) {
+		if(CTxdStore::GetNumRefs(leafDebrisTxd) > 0) CTxdStore::RemoveRefWithoutDelete(leafDebrisTxd);
+		if(CTxdStore::GetNumRefs(leafDebrisTxd) == 0) CTxdStore::RemoveTxdSlot(leafDebrisTxd);
+		leafDebrisTxd = -1;
+	}
+}
 
 float      CParticle::ms_afRandTable[CParticle::RAND_TABLE_SIZE];
 CParticle *CParticle::m_pUnusedListHead;
@@ -895,6 +936,7 @@ CParticle *CParticle::AddParticle(tParticleType type, CVector const &vecPos, CVe
 		return nil;
 	
 	tParticleSystemData *psystem = &mod_ParticleSystemManager.m_aParticles[type];
+	type=psystem->m_Type; // Preserve native behavior for independently configured Leaf lists.
 	
 	if ( psystem->m_fCreateRange != 0.0f && psystem->m_fCreateRange < ( TheCamera.GetPosition() - vecPos ).MagnitudeSqr() )
 		return nil;

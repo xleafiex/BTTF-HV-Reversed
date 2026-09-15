@@ -33,6 +33,10 @@
 #include "Debug.h"
 #include "GenericGameStorage.h"
 #include "Camera.h"
+#include "crossplatform.h"
+
+bool CCamera::bLeafFirstPerson = false;
+float CCamera::bLeafFirstPersonBodyAlpha = 1.0f;
 
 enum
 {
@@ -544,6 +548,77 @@ CCamera::Process(void)
 		CamUp.Normalise();
 	}
 
+    // Apply after normal camera interpolation/collision, before the RW matrix.
+    // The removable debug module owns only the toggle; freecam settings stay intact.
+    static bool headWasActive = false;
+    static float headEntryBlend=0;
+    static CVehicle *headVehicle = nil;
+    static CPlayerPed *previousHeadPed = nil;
+    static float headYaw = 0.0f, headPitch = 0.0f;
+    CPlayerPed *headPed = FindPlayerPed();
+    if(bLeafFirstPerson && headPed && headPed->m_rwObject){
+        const CVector entrySource=CamSource,entryFront=CamFront,entryUp=CamUp;
+        if(!headWasActive)headEntryBlend=0;
+        headEntryBlend=Min(1.0f,headEntryBlend+CTimer::GetTimeStepInSeconds()/1.2f);
+        CVehicle *vehicle = headPed->bInVehicle ? headPed->m_pMyVehicle : nil;
+        if(!headWasActive || headPed != previousHeadPed || vehicle != headVehicle){
+            headYaw = vehicle ? 0.0f : Atan2(headPed->GetForward().y, headPed->GetForward().x);
+            headPitch = 0.0f;
+        }
+        if(!FrontEndMenuManager.m_bMenuActive && !CTimer::GetIsPaused() && IsForegroundApp()){
+            headYaw -= CPad::GetPad(0)->GetMouseX() * m_fMouseAccelHorzntl;
+            headPitch += CPad::GetPad(0)->GetMouseY() * m_fMouseAccelVertical;
+            while(headYaw > PI) headYaw -= TWOPI;
+            while(headYaw < -PI) headYaw += TWOPI;
+            headPitch = clamp(headPitch, -1.3f, 1.3f);
+        }
+        CVector up(0.0f, 0.0f, 1.0f);
+        CVector horizontal(Cos(headYaw), Sin(headYaw), 0.0f);
+        if(vehicle){
+            up = vehicle->GetUp();
+            horizontal = vehicle->GetForward()*Cos(headYaw) - vehicle->GetRight()*Sin(headYaw);
+        }
+        CamFront = horizontal*Cos(headPitch) + up*Sin(headPitch);
+        CamFront.Normalise();
+        CVector right = CrossProduct(CamFront, up);
+        right.Normalise();
+        CamUp = CrossProduct(right, CamFront);
+        CamUp.Normalise();
+        headPed->GetMatrix().UpdateRW();
+        headPed->UpdateRwFrame();
+        headPed->UpdateRpHAnim();
+        headPed->m_pedIK.GetComponentPosition(CamSource, PED_HEAD);
+        // The head joint is inside the neck/skull, not at the eyes. Keep
+        // the eye offset horizontal when pitching down so the view does
+        // not retreat into the shirt. Seated clearance stays smaller.
+        const float downwardLook = clamp(-Sin(headPitch), 0.0f, 1.0f);
+        CamSource += horizontal * ((vehicle ? 0.14f : 0.22f) + downwardLook*0.08f);
+        CamSource += up * 0.10f;
+        if(!headWasActive || headPed != previousHeadPed || vehicle != headVehicle)
+            debug("Leaf head camera v2: vehicle=%d ped=(%.3f,%.3f,%.3f) head=(%.3f,%.3f,%.3f)\n",
+                vehicle != nil, headPed->GetPosition().x, headPed->GetPosition().y, headPed->GetPosition().z,
+                CamSource.x, CamSource.y, CamSource.z);
+        const float headEase=headEntryBlend*headEntryBlend*(3-2*headEntryBlend);
+        CamSource=entrySource*(1-headEase)+CamSource*headEase;
+        CamFront=entryFront*(1-headEase)+CamFront*headEase;CamFront.Normalise();
+        CamUp=entryUp*(1-headEase)+CamUp*headEase;CamUp.Normalise();
+        Cams[ActiveCam].Source = CamSource;
+        Cams[ActiveCam].Front = CamFront;
+        Cams[ActiveCam].Up = CamUp;
+        Cams[ActiveCam].m_cvecTargetCoorsForFudgeInter = CamSource + CamFront*3.0f;
+        Cams[ActiveCam].DirectionWasLooking = LOOKING_FORWARD;
+        FOV = Cams[ActiveCam].FOV = 70.0f;
+        // Preserve depth precision for the many closely spaced cabin parts.
+        RwCameraSetNearClipPlane(Scene.camera, 0.12f);
+        headWasActive = true;
+        headVehicle = vehicle;
+        previousHeadPed = headPed;
+    }else{
+        headWasActive = false;
+        headVehicle = nil;
+        previousHeadPed = nil;
+    }
+
 	GetMatrix().GetRight() = CrossProduct(CamUp, CamFront);	// actually Left
 	GetMatrix().GetForward() = CamFront;
 	GetMatrix().GetUp() = CamUp;
@@ -575,7 +650,7 @@ CCamera::Process(void)
 
 	// Set RW camera
 #ifndef MASTER
-	if(WorldViewerBeingUsed){
+	if(WorldViewerBeingUsed && !bLeafFirstPerson){
 		RwFrame *frame = RwCameraGetFrame(m_pRwCamera);
 		CVector Source = Cams[2].Source;
 		CVector Front = Cams[2].Front;

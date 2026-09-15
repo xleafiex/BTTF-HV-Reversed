@@ -3,6 +3,7 @@
 #include "NodeName.h"
 
 static int32 gPluginOffset;
+static const int32 NodeNameCapacity = 128;
 
 enum
 {
@@ -28,15 +29,19 @@ NodeNameDestructor(void *object, RwInt32 offsetInObject, RwInt32 sizeInObject)
 void*
 NodeNameCopy(void *dstObject, const void *srcObject, RwInt32 offsetInObject, RwInt32 sizeInObject)
 {
-	strncpy(NODENAMEEXT(dstObject), NODENAMEEXT(srcObject), 23);
+	strncpy(NODENAMEEXT(dstObject), NODENAMEEXT(srcObject), NodeNameCapacity - 1);
+	NODENAMEEXT(dstObject)[NodeNameCapacity - 1] = '\0';
 	return nil;
 }
 
 RwStream*
 NodeNameStreamRead(RwStream *stream, RwInt32 binaryLength, void *object, RwInt32 offsetInObject, RwInt32 sizeInObject)
 {
-	RwStreamRead(stream, NODENAMEEXT(object), binaryLength);
-	NODENAMEEXT(object)[binaryLength] = '\0';
+	if (binaryLength < 0) return nil;
+	int32 count = binaryLength < NodeNameCapacity ? binaryLength : NodeNameCapacity - 1;
+	RwStreamRead(stream, NODENAMEEXT(object), count);
+	NODENAMEEXT(object)[count] = '\0';
+	if (binaryLength > count) RwStreamSkip(stream, binaryLength - count);
 	return stream;
 }
 
@@ -57,7 +62,7 @@ NodeNameStreamGetSize(const void *object, RwInt32 offsetInObject, RwInt32 sizeIn
 bool
 NodeNamePluginAttach(void)
 {
-	gPluginOffset = RwFrameRegisterPlugin(24, ID_NODENAME,
+	gPluginOffset = RwFrameRegisterPlugin(NodeNameCapacity, ID_NODENAME,
                                 NodeNameConstructor,
                                 NodeNameDestructor,
                                 NodeNameCopy);

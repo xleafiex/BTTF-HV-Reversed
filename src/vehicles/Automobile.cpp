@@ -1,5 +1,6 @@
 #include "common.h"
 #include "main.h"
+#include "LeafMods.h"
 
 #include "General.h"
 #include "RwHelper.h"
@@ -1540,8 +1541,11 @@ CAutomobile::ProcessControl(void)
 		break;
 	}
 
-	// move fire forward if in first person
-	if(this == FindPlayerVehicle() && TheCamera.GetLookingForwardFirstPerson())
+	const bool leafRearEngine = GetModelIndex()==MI_DELUXO && LeafMods::PreserveVehicleFrames(MI_DELUXO);
+	// The Leaf DeLorean's reactor/engine bay is behind the cabin.
+	if(leafRearEngine) damagePos=CVector(0.0f,-1.9f,0.45f);
+	// move stock front-engine fire forward if in first person
+	if(!leafRearEngine && this == FindPlayerVehicle() && TheCamera.GetLookingForwardFirstPerson())
 		if(m_fHealth < 250.0f && GetStatus() != STATUS_WRECKED){
 			if(GetModelIndex() == MI_FIRETRUCK)
 				damagePos += CVector(0.0f, 3.0f, -0.2f);
@@ -1815,6 +1819,7 @@ CAutomobile::PreRender(void)
 				rearSkidding = true;
 
 			for(i = 0; i < 4; i++){
+				if(LeafMods::HasRailWheels(this))continue;
 				if(m_aSuspensionSpringRatioPrev[i] < 1.0f && m_aWheelColPoints[i].surfaceB != SURFACE_WATER)
 				switch(m_aWheelState[i]){
 				case WHEEL_STATE_SPINNING:
@@ -4355,7 +4360,8 @@ CAutomobile::AddDamagedVehicleParticles(void)
 {
 	int i, n;
 
-	if(this == FindPlayerVehicle() && TheCamera.GetLookingForwardFirstPerson())
+	if(this == FindPlayerVehicle() && TheCamera.GetLookingForwardFirstPerson() &&
+	   !(GetModelIndex()==MI_DELUXO && LeafMods::PreserveVehicleFrames(MI_DELUXO)))
 		return;
 	if(this != FindPlayerVehicle() && (CTimer::GetFrameCounter() + m_randomSeed) & 1)
 		return;
@@ -4378,7 +4384,9 @@ CAutomobile::AddDamagedVehicleParticles(void)
 		break;
 	}
 
-	if(GetModelIndex() == MI_BFINJECT)
+	if(GetModelIndex()==MI_DELUXO && LeafMods::PreserveVehicleFrames(MI_DELUXO))
+		damagePos=CVector(0.0f,-1.9f,0.45f);
+	else if(GetModelIndex() == MI_BFINJECT)
 		damagePos = CVector(0.3f, -1.5f, -0.1f);
 	else if(GetModelIndex() == MI_CADDY)
 		damagePos = CVector(0.6f, -1.0f, -0.25f);

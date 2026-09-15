@@ -14,9 +14,7 @@
 #include "Object.h"
 #include "CarCtrl.h"
 
-#ifndef _WIN32
 #include <float.h>
-#endif
 
 CCivilianPed::CCivilianPed(ePedType pedtype, uint32 mi) : CPed(pedtype)
 {

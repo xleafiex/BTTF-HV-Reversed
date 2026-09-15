@@ -5,6 +5,10 @@
 [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2FGTAmodding%2Fre3%2Fbadge%3Fref%3Dmiami&style=flat)](https://actions-badge.atrox.dev/GTAmodding/re3/goto?ref=miami)
 <a href="https://discord.gg/ERYg58ttcE"><img src="https://img.shields.io/badge/discord-join-7289DA.svg?logo=discord&longCache=true&style=flat" /></a>
 
+## Miami native DeLorean branch
+
+The `miami` branch contains the native 64-bit reVC Miami port. See [MIAMI-MOD.md](MIAMI-MOD.md) for the install command, release scope, controls, and the systems moved from the donor project. The release installer installs only `delorean.leaf` and the minimal first-person/debug archive; graphics and ragdoll modules remain source-only for now.
+
 ## Intro
 
 In this repository you'll find the fully reversed source code for GTA III ([master](https://github.com/GTAmodding/re3/tree/master/) branch) and GTA VC ([miami](https://github.com/GTAmodding/re3/tree/miami/) branch).
