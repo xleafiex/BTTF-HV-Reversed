@@ -7,7 +7,7 @@ This branch carries the native Windows MinGW work for the Miami DeLorean project
 The current release installer installs two archives:
 
 * `delorean.leaf` contains the donor DeLorean model, collision, textures, sounds, cabin systems, vehicle variations and native effects.
-* `debug.leaf` contains a small freeroam SCM for a clean test start and the first-person head camera. The release debug archive intentionally does not include the development fire-preview or body-opacity controls.
+* `debug.leaf` contains the first-person head camera only. The public release does not replace or disable the campaign SCM; the freeroam SCM is retained only in the development debug build.
 
 Graphics and ragdoll work remains in the source tree for development, but is not installed by the release installer yet. The normal reVC anti-aliasing path remains in charge of anti-aliasing.
 
@@ -30,7 +30,7 @@ To remove the port, close the game and delete `mods\delorean.leaf` and `mods\deb
 ### Debug camera and test start
 
 * `F10` toggles the head-mounted first-person camera on foot and in the DeLorean. Mouse look remains active, the normal free camera is preserved, and the local head is hidden while looking through the view.
-* The release `debug.leaf` supplies a stripped freeroam SCM so a new game starts directly in a test scene instead of starting the campaign. Removing `debug.leaf` restores the campaign SCM.
+* The release `debug.leaf` does not replace the campaign SCM. Development builds can package the stripped freeroam SCM separately for local testing.
 * `.` spawns the DeLorean or advances its donor variation when the player is not already in a car. The variation order is BTTF I plutonium, holder-only, side-hook, BTTF II Mr. Fusion, BTTF III whitewall, horse-hook, and railroad/firebox.
 
 ### Vehicle and time circuits
