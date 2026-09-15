@@ -26,11 +26,10 @@ The main controls are documented in [MIAMI-MOD.md](MIAMI-MOD.md). The important 
 
 * `.` — spawn or cycle DeLorean variations.
 * `F10` — toggle the head-mounted first-person camera.
-* `Enter` — enter and exit with the donor door animation.
 * `C` — hover conversion on BTTF II.
 * `M` — cinematic or instant time travel.
 * `+` — time circuits.
-* `0`–`9`, then `-` — destination keypad.
+* `0`–`9`, then `-` — destination keypad. (currently only supports full date and time)
 * `Tab` — refuelling at the rear, or side-hook movement at the passenger side.
 * `U`/`I` — wiper controls; `J`/`K` — windows.
 * `Left Shift+L`, `Right Shift+L`, or `L` — indicators and hazards.
@@ -40,8 +39,6 @@ The main controls are documented in [MIAMI-MOD.md](MIAMI-MOD.md). The important 
 
 * `leaf-modules/delorean` — native DeLorean systems and package builder.
 * `leaf-modules/debug` — first-person camera plus development-only debug helpers.
-* `leaf-modules/graphics` — source-only graphics work.
-* `leaf-modules/ragdoll` — source-only Bullet prototype.
 * `install_miami_release.ps1` — public release installer.
 * `MIAMI-MOD.md` — detailed feature and control reference.
 
