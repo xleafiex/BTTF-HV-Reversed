@@ -365,5 +365,7 @@ work/
 re3/
 leaf-modules/__pycache__/
 leaf-modules/*/__pycache__/
+!leaf-modules/debug/
+!leaf-modules/debug/**
 
 src/extras/GitSHA1.cpp
