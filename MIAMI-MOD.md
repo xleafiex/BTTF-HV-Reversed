@@ -7,35 +7,17 @@ This branch carries the native Windows MinGW work for the Miami DeLorean project
 The current release installer installs two archives:
 
 * `delorean.leaf` contains the donor DeLorean model, collision, textures, sounds, cabin systems, vehicle variations and native effects.
-* `debug.leaf` contains the first-person head camera only. The public release does not replace or disable the campaign SCM; the freeroam SCM is retained only in the development debug build.
-
-Graphics and ragdoll work remains in the source tree for development, but is not installed by the release installer yet. The normal reVC anti-aliasing path remains in charge of anti-aliasing.
-
-## Install
-
-1. Close reVC.
-2. Check out the `miami` branch and make sure the donor folder exists at `E:\My Documents\crap\modding\BTTF HV\current wip\Grand Theft Auto Vice City (HV)`, or pass your donor path to the script.
-3. From the repository root, run:
-
-```powershell
-.\install_miami_release.ps1
-```
-
-The script builds the matching `reVC.exe` when needed, creates the two Leaf archives, and copies them to `mods` in the game folder. To force a rebuild, use `.\install_miami_release.ps1 -Build`. Custom paths are supported with `-Install` and `-Donor`.
-
-To remove the port, close the game and delete `mods\delorean.leaf` and `mods\debug.leaf`. The base game files are not modified by the Leaf archives.
+* `debug.leaf` contains the first-person head camera only.
 
 ## Controls in the release
 
 ### Debug camera and test start
 
 * `F10` toggles the head-mounted first-person camera on foot and in the DeLorean. Mouse look remains active, the normal free camera is preserved, and the local head is hidden while looking through the view.
-* The release `debug.leaf` does not replace the campaign SCM. Development builds can package the stripped freeroam SCM separately for local testing.
 * `.` spawns the DeLorean or advances its donor variation when the player is not already in a car. The variation order is BTTF I plutonium, holder-only, side-hook, BTTF II Mr. Fusion, BTTF III whitewall, horse-hook, and railroad/firebox.
 
 ### Vehicle and time circuits
 
-* `Enter` uses the normal vehicle entry and door animation.
 * `C` starts the BTTF II hover conversion. On other variants it resets the console clock to the last departure.
 * `M` switches between cinematic and instant time travel.
 * `+` (top-row `=`/`+` or numpad `+`) toggles the time circuits.
@@ -49,7 +31,7 @@ To remove the port, close the game and delete `mods\delorean.leaf` and `mods\deb
 
 * `U` cycles wipers through normal, fast and off; intermittent mode parks with `U`.
 * `I` operates the reverse/single-sweep wiper stalk.
-* `J` and `K` lower or raise the left and right windows.
+* `J` and `K` lower or raise the left and right windows. 
 * `Left Shift` + `L` toggles the left indicator; `Right Shift` + `L` toggles the right indicator; `L` by itself toggles hazards. Press the same combination again to turn it off.
 * `P` toggles the overhead emergency light, its handle and donor sound.
 * Horn input moves the mapped turn-signal stalk.
@@ -64,9 +46,7 @@ The native module keeps its custom particle presets and textures inside `delorea
 ## Source layout
 
 * `leaf-modules/delorean` — native DeLorean module and removable package builder.
-* `leaf-modules/debug` — first-person camera, release SCM wrapper, and development-only debug helpers.
-* `leaf-modules/graphics` — source-only graphics module.
-* `leaf-modules/ragdoll` — source-only Bullet prototype.
+* `leaf-modules/debug` — first-person camera
 * `install_miami_release.ps1` — one-command build/package/install path for the current release.
 * `build_reVC_miami.bat` — full MinGW build helper.
 
