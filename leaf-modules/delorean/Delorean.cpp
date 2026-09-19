@@ -1269,6 +1269,21 @@ void UpdateCinematicTravel(CAutomobile *car) {
     const uint32 elapsed=CTimer::GetTimeInMilliseconds()-cinematicTravel.started;
     car->GetMatrix()=cinematicTravel.matrix;car->GetMatrix().UpdateRW();car->UpdateRwFrame();
     car->SetMoveSpeed(CVector(0,0,0));car->SetTurnSpeed(0,0,0);
+    // Keep the cinematic camera spatially tied to the stored departure pose.
+    // The old sequence held one fixed point for its whole duration, which made
+    // the implosion look flat and let the trail/wormhole drift toward the edge
+    // of the frame on wide views.  A short eased dolly gives the departure a
+    // readable scale while preserving the donor heading and fixed-mode control.
+    if(!cinematicTravel.reentered){
+        const float move=Bound(float(elapsed)/2200.0f,0.0f,1.0f);
+        const float ease=move*move*(3.0f-2.0f*move);
+        const CVector origin=cinematicTravel.matrix.GetPosition();
+        const CVector camera=origin-cinematicTravel.matrix.GetForward()*(44.0f-7.0f*ease)
+            +cinematicTravel.matrix.GetRight()*(9.0f-1.5f*ease)
+            +cinematicTravel.matrix.GetUp()*(7.0f-1.5f*ease);
+        TheCamera.SetCamPositionForFixedMode(camera,CVector(0,0,0));
+        TheCamera.m_fFovForTrain=92.0f-8.0f*ease;
+    }
     if(elapsed>=50 && !cinematicTravel.vanished){
         car->bIsVisible=false;car->bUsesCollision=false;cinematicTravel.vanished=true;wormholeFrame=0;
         StartImplosion(cinematicTravel.matrix.GetPosition());
