@@ -866,6 +866,7 @@ void Spawn() {
     compassState={}; previousCompassVelocity=CVector(0,0,0); compassVelocityReady=false;
     doorSounds={};
     engineSounds={};
+    InitialiseHoodboxEmitters(car);
     for(int &level:sidLevels) level=0; sidPending=0;
     Variation();
     Help("DeLorean: C converts hover; M changes travel mode; Tab refuels; period changes variation.");
@@ -1520,11 +1521,12 @@ void UpdatePlasmaAndSparks(CAutomobile *car,float speed,uint32 now) {
     UpdateTravelArcs(car,sparks,now);
     if(sparks) {
         if(!sparkLoopActive) {
-            SoundAt("delorean/sparks.wav",0,0,0,20,true);
+            if(variant==3)SoundAt("delorean/sparks_hoodbox.wav",0,1.6f,.4f,20,true);
+            else SoundAt("delorean/sparks.wav",0,0,0,20,true);
             sparkLoopActive=true;
         }
     } else if(sparkLoopActive) {
-        DonorAudio::Stop("delorean/sparks.wav");sparkLoopActive=false;
+        DonorAudio::Stop("delorean/sparks.wav");DonorAudio::Stop("delorean/sparks_hoodbox.wav");sparkLoopActive=false;
     }
     // The dedicated world-pass shader draws the wheel plasma every frame.
     // Keep the legacy sprite path only as a shader-creation fallback.

@@ -44,7 +44,7 @@ The current release installer installs two archives:
 
 ### Vehicle features included so far
 
-BTTF III hoodbox spark pass: separate depth-tested hot-core/trail geometry emitted from the donor hoodbox footprint, inherited car velocity, gravity and drag, blue-white accents and warm fading sparks. Density increases during the approach to 88 MPH, with a one-second arrival burst. Hidden/cinematic and wrecked cars suppress this pass. This is a visual approximation for movie-parity tuning, not a verified frame-for-frame movie match; exact emission timing and placement await visual testing.
+BTTF III hoodbox spark pass: six emitters resolve against the actual bonnetbttf3 mesh and follow its frame. Irregular localized bursts use thin feathered hot cores and trails, inherited car velocity, gravity and drag, blue-white accents and warm fading sparks. The donor hoodbox-specific spark loop replaces the generic loop for BTTF III. Density increases during the approach to 88 MPH, with a one-second arrival burst. Hidden/cinematic and wrecked cars suppress the visual pass. Offline model inspection confirmed all six emitter locations intersect the donor mesh. This remains a visual approximation for movie-parity tuning, not a verified frame-for-frame movie match.
 
 BTTF III hoodbox variants now use independent donor coil-segment flicker at 50 ms intervals while charging below 47 m/s (about 86 MPH), settling into steady segment-four illumination above that speed. BTTF I/II retain steady coils.
 
