@@ -1291,9 +1291,9 @@ void UpdateCinematicTravel(CAutomobile *car) {
     if(cinematicTravel.vanished && !cinematicTravel.revealed){
         car->bIsVisible=false;
         if(FindPlayerPed())FindPlayerPed()->bIsVisible=false;
-        if(elapsed>=350 && !departureTrail.ignited){
-            // Fire grows from the stored pre-jump heading, away from the
-            // rear of the car, 300ms into the implosion animation.
+        if(elapsed>=550 && !departureTrail.ignited){
+            // Let the implosion establish the departure point before the fire
+            // trails ignite; they then grow away from the stored heading.
             departureTrail.active=true;
             departureTrail.ignited=true;
             departureTrail.started=CTimer::GetTimeInMilliseconds();
@@ -2184,7 +2184,10 @@ void Update() {
 }
 void DrawLightBeams() {
     CAutomobile *car=Car();
-    if(!enabled || !car || FrontEndMenuManager.m_bMenuActive) return;
+    // The native beam pass is independent of stock vehicle visibility. Gate it
+    // explicitly so headlights and the cabin lamp cannot remain visible during
+    // the hidden phase of cinematic departure.
+    if(!enabled || !car || !car->bIsVisible || cinematicTravel.active || FrontEndMenuManager.m_bMenuActive) return;
     if(!car->bLightsOn && !emergencyLight.on) return;
     const RwRenderState states[]={rwRENDERSTATETEXTURERASTER,rwRENDERSTATEZTESTENABLE,
         rwRENDERSTATEZWRITEENABLE,rwRENDERSTATEVERTEXALPHAENABLE,rwRENDERSTATESRCBLEND,
