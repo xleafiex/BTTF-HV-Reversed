@@ -534,6 +534,7 @@ void ApplyBttf3FrontSuspension(CAutomobile *car, bool raise) {
 }
 void StartHoverConversion(CAutomobile *car) {
     if(hoverTransition) return;
+    car->bNotDamagedUpsideDown=true;
     if(hover) {
         if(!autoLanding) {
             autoLanding=true;
@@ -561,26 +562,27 @@ void UpdateHoverConversion(CAutomobile *car) {
         if(hoverPivot>0.0f) hoverPivot=Max(0.0f,hoverPivot-step*5.0f);
         else hoverExtension=Max(0.0f,hoverExtension-step*.01f);
         if(hoverExtension<=0.0f) {
-            hoverTransition=0; hover=false; autoLanding=false; Variation(); DonorAudio::Stop("delorean/landspeeder_loop_lower_pitch.wav"); boostActive=false; Log("Hover landing conversion complete");
+            hoverTransition=0; hover=false; autoLanding=false; car->bNotDamagedUpsideDown=false; Variation(); DonorAudio::Stop("delorean/landspeeder_loop_lower_pitch.wav"); boostActive=false; Log("Hover landing conversion complete");
         }
     }
     ApplyHoverModel(); UpdateWheels(car);
 }
-void HoverEffects(CAutomobile *car) {
+void HoverEffects(CAutomobile *car,bool focused) {
     if(cinematicTravel.active)return;
     if(!hover || hoverPivot<89.0f) {
         hoverAccelerating=false;hoverThrusterActive=false;return;
     }
     CPad *pad=CPad::GetPad(0);
-    const bool boost=pad->GetHandBrake() && pad->GetAccelerate()>153;
+    const bool controls=focused && FindPlayerVehicle()==car;
+    const bool boost=controls && pad->GetHandBrake() && pad->GetAccelerate()>153;
     const float speed=car->GetMoveSpeed().Magnitude()*GAME_SPEED_TO_METERS_PER_SECOND;
-    const bool accelerating=pad->GetAccelerate()>=150;
+    const bool accelerating=controls && pad->GetAccelerate()>=150;
     if(accelerating && !hoverAccelerating && speed>30.0f)
         SoundAt("delorean/landspeeder_accelerate_2_lower_pitch.wav",0,0,0,10);
     if(!accelerating && hoverAccelerating && speed>30.0f)
         SoundAt("delorean/landspeeder_decelerate_2_lower_pitch.wav",0,0,0,10);
     hoverAccelerating=accelerating;
-    const bool rising=pad->GetSteeringUpDown()<-30 && !accelerating;
+    const bool rising=controls && pad->GetSteeringUpDown()<-30 && !accelerating;
     if(rising && !hoverThrusterActive)SoundAt("delorean/wheel_thrust.wav",0,0,0,10);
     hoverThrusterActive=rising;
     if(boost && !boostActive) { Sound("delorean/boost.wav"); Log("Hover boost engaged"); }
@@ -815,7 +817,7 @@ void Spawn() {
     car->SetPosition(p); car->SetOrientation(0,0,FindPlayerPed()->GetForward().Heading());
     car->SetStatus(STATUS_ABANDONED); car->m_nDoorLock = CARLOCK_UNLOCKED;
     car->bIsLocked = false;
-    car->bNotDamagedUpsideDown = true;
+    car->bNotDamagedUpsideDown = false;
     // HV carcols_additional.dat: stainless body and grey trim.
     car->m_currentColour1=79; car->m_currentColour2=71;
     // The stock Deluxo handling can mark all doors as missing.  The donor
@@ -890,17 +892,24 @@ void CaptureDebugSpawnCoordinates(){
     Log(line);
 }
 // Source hover.cpp equations adapted to reVC's matrices and handling names.
-void Fly(CAutomobile *car) {
+void Fly(CAutomobile *car,bool focused) {
     float step = Bound(CTimer::GetTimeStep(),0.0f,3.0f);
     CPad *pad = CPad::GetPad(0);
-    float pedal = (pad->GetAccelerate()-pad->GetBrake())/255.0f;
+    const bool occupied=FindPlayerVehicle()==car;
+    const bool controls=occupied && focused;
+    float pedal = controls?(pad->GetAccelerate()-pad->GetBrake())/255.0f:0.0f;
     float fwd = DotProduct(car->GetMoveSpeed(),car->GetForward());
     float thrust = handling.Transmission.fEngineAcceleration * 5.0f;
     float falloff = fwd > 0 || pedal > 0 ? 0.5f/handling.Transmission.fMaxVelocity : -1.0f/handling.Transmission.fMaxReverseVelocity;
-    float accel = (pedal-falloff*fwd)*thrust*(pad->GetHandBrake() && pedal > 0.6f ? 0.8f : 0.3f);
+    float accel = (pedal-falloff*fwd)*thrust*(controls && pad->GetHandBrake() && pedal > 0.6f ? 0.8f : 0.3f);
     bool groundFound=false;
     const CVector position=car->GetPosition();
     const float groundZ=CWorld::FindGroundZFor3DCoord(position.x,position.y,position.z+3.0f,&groundFound);
+    // Hover.txt converts unattended cars within five metres of the ground.
+    // Continue the altitude controller until touchdown instead of dropping
+    // lift immediately when the driver leaves.
+    if(!occupied && !hoverTransition && hoverPivot>=89 && groundFound && position.z-groundZ<5.0f)
+        autoLanding=true;
     // Hold the altitude at which flight mode finished converting.  Pressing C
     // again lowers that target toward the road and leaves the wheels deployed
     // until the car is close enough to touch down safely.
@@ -919,9 +928,9 @@ void Fly(CAutomobile *car) {
     car->ApplyMoveForce(car->GetForward()*(accel*car->m_fMass*step));
     float side = -DotProduct(car->GetMoveSpeed(),car->GetRight());
     car->ApplyMoveForce(car->GetRight()*(0.15f*side*fabsf(side)*car->m_fMass*step));
-    float pitch = pad->GetSteeringUpDown()/128.0f;
-    float roll = -pad->GetSteeringLeftRight()/128.0f;
-    float yaw = pad->GetCarGunLeftRight()/128.0f;
+    float pitch = controls?pad->GetSteeringUpDown()/128.0f:0.0f;
+    float roll = controls?-pad->GetSteeringLeftRight()/128.0f:0.0f;
+    float yaw = controls?pad->GetCarGunLeftRight()/128.0f:0.0f;
     car->ApplyTurnForce(car->GetUp()*(pitch*0.0035f*car->m_fTurnMass*step), car->GetForward());
     car->ApplyTurnForce(car->GetUp()*(roll*0.0065f*car->m_fTurnMass*step), car->GetRight());
     car->ApplyTurnForce(car->GetRight()*(-0.001f*yaw*car->m_fTurnMass*step), -car->GetForward());
@@ -2030,7 +2039,7 @@ void UpdateCabin(CAutomobile *car,bool focused) {
     if(engineSounds.accelerate) SoundAt("delorean/engine_accelerate.wav",0,-2,0,20);
     if(engineSounds.decelerate) SoundAt("delorean/engine_decelerate.wav",0,-2,0,20);
     if(engineSounds.stopAcceleration) DonorAudio::Stop("delorean/engine_accelerate.wav");
-    if(car->bEngineOn && folded) SoundAt("delorean/engine_idle.wav",0,-2,0,20,true);
+    if(!cinematicTravel.active && car->bEngineOn && folded) SoundAt("delorean/engine_idle.wav",0,-2,0,20,true);
     else DonorAudio::Stop("delorean/engine_idle.wav");
     if(engineSounds.hoverGain>0) SoundAt("delorean/landspeeder_loop_lower_pitch.wav",0,-2,0,20,true,engineSounds.hoverGain);
     else DonorAudio::Stop("delorean/landspeeder_loop_lower_pitch.wav");
@@ -2108,7 +2117,7 @@ void Update() {
                 car->GetMoveSpeed()*-.2f+CVector(0,0,.025f),nil,.012f,RwRGBA{255,200,100,255},0,0,0,120);
         }
     }
-    UpdateDoors(car); UpdatePanels(car); UpdateWheels(car); UpdateHoverConversion(car); HoverEffects(car); UpdateRefuel();
+    UpdateDoors(car); UpdatePanels(car); UpdateWheels(car); UpdateHoverConversion(car); HoverEffects(car,focused); UpdateRefuel();
     UpdateColdEffects(car);
     UpdateArrival();
     UpdateImplosion();
@@ -2128,7 +2137,7 @@ void Update() {
     UpdateHookAnimation();
     // Physics must continue while the window is unfocused; only keyboard
     // interactions are suppressed in the background.
-    if(hover && !cinematicTravel.active) Fly(car);
+    if(hover && !cinematicTravel.active) Fly(car,focused);
     if(!focused || cinematicTravel.active) {
         // Consume key edges while input is unavailable. Holding a number,
         // plus or minus through arrival must not queue a cockpit action.
