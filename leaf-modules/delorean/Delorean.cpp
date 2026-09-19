@@ -47,6 +47,7 @@
 #include "OriginalComponents.h"
 #include "ArrivalSequence.h"
 #include "DonorSystems.h"
+#include "IgnitionCycle.h"
 #include "DonorAudio.h"
 #include "DonorCabin.h"
 #include "DonorLegPose.h"
@@ -63,6 +64,8 @@ std::string root;
 bool enabled = false, changedModel = false, circuits = true, fuel = true, hover = false;
 bool boostActive = false;
 bool instantTravelMode = false;
+bool travelHudVisible = true;
+DonorSystems::IgnitionCycle ignitionCycle;
 struct CinematicTravel {
     bool active=false, vanished=false, fading=false, reentered=false, revealed=false;
     bool savedFirstPerson=false, savedDriverVisible=true, savedCollision=true, savedSpecialFov=false;
@@ -775,6 +778,12 @@ void Variation() {
           "fxthrusterbttf2rbon","fxthrusterbttf2rbth","fxthrusterbttf2rfon","fxthrusterbttf2rfth",
           "fxthrusterbttf2lbon","fxthrusterbttf2lbth","fxthrusterbttf2lfon","fxthrusterbttf2lfth"});
     ApplyBttf3FrontSuspension(Car(), variant==3 && hookMode!=2);
+    // VehicleFlags.txt selects traction and exhaust from the fitted parts.
+    // The native component list calls the whitewall wheel fxwheelbttf3rb.
+    handling.Flags &= ~(HANDLING_GOOD_INSAND | HANDLING_NO_EXHAUST);
+    if(variant==3 && hookMode!=2) handling.Flags |= HANDLING_GOOD_INSAND;
+    if(hidden.count("exhaustmodel")) handling.Flags |= HANDLING_NO_EXHAUST;
+    if(Car()) Car()->pHandling->Flags=handling.Flags;
     ApplyVisibility();
 }
 #include "RaisedFrost.h"
@@ -826,6 +835,8 @@ void Spawn() {
         a->getPipeline()->instance(a);return a;
     },nil);
     hover = false; fuel=false; lowPower=true; circuits=false; dashboard=DonorSystems::Dashboard();
+    ignitionCycle={}; cranking=false; crankUntil=0; startAttempts=0;
+    stallDeadline=CTimer::GetTimeInMilliseconds()+5000+(rand()%15001);
     reactorGauges={};
     if(fuel && circuits){
         reactorGauges.power=23.0f;
@@ -1991,6 +2002,7 @@ void Update() {
     UpdateHookDrops(CTimer::GetTimeStepInSeconds());
     DWORD pid=0; GetWindowThreadProcessId(GetForegroundWindow(),&pid);
     const bool focused=pid==GetCurrentProcessId();
+    if(focused && Press(VK_OEM_4)) travelHudVisible=!travelHudVisible;
     const bool variationPressed=focused && Press(VK_OEM_PERIOD);
     if(variationPressed && !FindPlayerVehicle()) Spawn();
     CAutomobile *car=Car(); if(!car || car->GetStatus()==STATUS_WRECKED) {
@@ -2010,35 +2022,31 @@ void Update() {
     // Donor low-power ignition: after travel the reactor can stall at a
     // variable time; throttle presses make repeated restart attempts.
     const uint32 powerNow=CTimer::GetTimeInMilliseconds();
-    if(lowPower && !refueling && powerNow>=stallDeadline && car->bEngineOn) {
+    if(lowPower && !refueling && !cinematicTravel.active && powerNow>=stallDeadline && car->bEngineOn) {
         car->bEngineOn=false; startAttempts=0;
+        ignitionCycle={};
         emptyFlashUntil=0; emptyAudioPhase=-1; emptyAudioActive=false;
         Help("Reactor power is low. Hold throttle to restart.");
     }
-    const bool throttleStart=lowPower && !refueling && !car->bEngineOn && FindPlayerVehicle()==car && CPad::GetPad(0)->GetAccelerate()>150;
-    if(throttleStart) {
-        if(!cranking) { ++startAttempts; cranking=true; SoundLoop("delorean/engine_turnover.wav"); }
-        if(startAttempts>=6 || (rand()%4)==0) {
-            car->bEngineOn=true; startAttempts=0;
-            crankUntil=0;
-            SetRotation("ignitionkey",CVector(0,0,0));
-            SetRotation("ignition",CVector(0,0,0));
-            cranking=false; DonorAudio::Stop("delorean/engine_turnover.wav");
-            stallDeadline=powerNow+7000+(rand()%12001);
-            Sound("delorean/engine_start.wav");
-        } else {
-            crankUntil=powerNow+350;
-            SetRotation("ignitionkey",CVector(DEGTORAD(135),0,0));
-            SetRotation("ignition",CVector(DEGTORAD(135),0,0));
-            Sound("delorean/engine_turnover.wav");
-        }
+    const bool occupied=FindPlayerVehicle()==car;
+    const bool exiting=occupied && focused && CPad::GetPad(0)->GetExitVehicle();
+    // Donor Ignition.txt shuts down on the mapped exit control. Keep the
+    // native exit/door state machine in charge of actually leaving the car.
+    if(exiting && !cinematicTravel.active && !hover && !refueling)car->bEngineOn=false;
+    const bool throttleStart=focused && occupied && !exiting && !refueling &&
+        !cinematicTravel.active && !car->bEngineOn && CPad::GetPad(0)->GetAccelerate()>=150;
+    const double ignitionDt=Min(.1f,Max(0.0f,CTimer::GetTimeStepInSeconds()));
+    // Only draw randomness at a completed turnover, never once per frame.
+    const bool attemptDue=throttleStart && ignitionCycle.elapsed+ignitionDt+1e-9>=.2;
+    const bool started=ignitionCycle.Update(ignitionDt,throttleStart,lowPower,attemptDue?rand():1);
+    if(started){
+        car->bEngineOn=true;
+        stallDeadline=powerNow+7000+(rand()%12001);
+        // UpdateCabin owns the single engine_start sound on this transition.
     }
-    if(!throttleStart && cranking) { cranking=false; DonorAudio::Stop("delorean/engine_turnover.wav"); }
-    if(crankUntil && powerNow>=crankUntil) {
-        SetRotation("ignitionkey",CVector(0,0,0));
-        SetRotation("ignition",CVector(0,0,0));
-        crankUntil=0;
-    }
+    cranking=throttleStart && !started;
+    if(cranking)SoundLoop("delorean/engine_turnover.wav");
+    else DonorAudio::Stop("delorean/engine_turnover.wav");
     // Some VC damage/streaming paths reapply the model's door state.  The
     // donor always has intact front gullwings, so repair only an erroneous
     // missing flag while leaving ordinary open/damaged states alone.
@@ -2061,6 +2069,12 @@ void Update() {
     UpdateTemporalEffects(car);
     UpdateDashboard(car);
     UpdateCabin(car,focused);
+    // Dashboard animation runs first; the held starting-key pose wins while
+    // cranking and naturally restores from the dashboard after release.
+    if(cranking){
+        SetRotation("ignitionkey",CVector(DEGTORAD(135),0,0));
+        SetRotation("ignition",CVector(DEGTORAD(135),0,0));
+    } else SetRotation("ignition",CVector(DEGTORAD(dashboard.ignition),0,0));
     UpdateSID(car);
     UpdateReactorEffects(car);
     UpdateHookAnimation();
@@ -2342,13 +2356,10 @@ void DrawImplosion() {
     rw::SetRenderState(rw::ALPHATESTFUNC,rw::ALPHAALWAYS);
     RwRenderStateSet(rwRENDERSTATETEXTURERASTER,RwTextureGetRaster(texture));
     RwRenderStateSet(rwRENDERSTATEZTESTENABLE,(void*)TRUE);
-    // During departure the car is hidden and the implosion is the foreground
-    // volume. Writing its depth keeps later fire-trail passes behind the
-    // implosion instead of compositing over its bright core. Re-entry keeps
-    // the old transparent behavior so the returning car remains visible.
-    const bool implosionOccluder=cinematicTravel.active && cinematicTravel.vanished && !cinematicTravel.revealed;
-    RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,
-        reinterpret_cast<void *>(static_cast<uintptr_t>(implosionOccluder?TRUE:FALSE)));
+    // Composite after the transparent trails, testing against solid world
+    // geometry. A blended quad must not write its transparent corners into
+    // scene depth (the ray-marched trails read that depth as an opaque wall).
+    RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,(void*)FALSE);
     RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE,(void*)TRUE);
     RwRenderStateSet(rwRENDERSTATESRCBLEND,(void*)rwBLENDSRCALPHA);RwRenderStateSet(rwRENDERSTATEDESTBLEND,(void*)rwBLENDINVSRCALPHA);
     RwRenderStateSet(rwRENDERSTATEFOGENABLE,(void*)FALSE);RwRenderStateSet(rwRENDERSTATECULLMODE,(void*)rwCULLMODECULLNONE);
@@ -2373,6 +2384,7 @@ void Draw() {
     const float sx=SCREEN_WIDTH/640.0f, sy=SCREEN_HEIGHT/448.0f;
     if(CTimer::GetTimeInMilliseconds()<flashUntil)
         CSprite2d::DrawRect(CRect(0,0,SCREEN_WIDTH,SCREEN_HEIGHT),CRGBA(210,235,255,180));
+    if(!travelHudVisible)return;
     CFont::SetScale(0.38f*sx,0.75f*sy); CFont::SetPropOn(); CFont::SetBackgroundOff(); CFont::SetCentreOff(); CFont::SetRightJustifyOff(); CFont::SetFontStyle(FONT_STANDARD);
     CFont::SetWrapx(620.0f*sx); CFont::SetColor(CRGBA(240,170,65,255));
     snprintf(msg,sizeof(msg),"DEST %08d %04d   %s   %s",destinationDate,destinationTime,circuits?"ON":"OFF",fuel?"READY":"REFUEL");
@@ -2500,8 +2512,7 @@ extern "C" __declspec(dllexport) bool LeafIsFireTrailPreviewActive() {return pre
 extern "C" __declspec(dllexport) bool LeafRenderPass(uint32_t stage) {
     if(stage==LEAF_PRE_RENDER && enabled && Car()) { UpdateLightBeams(Car()); DonorMirrors::Update(Car(),variant==3 && hookMode!=2 && !cinematicTravel.active); }
     if(stage==LEAF_BEFORE_VEHICLES) DrawWormhole();
-    if(stage==LEAF_BEFORE_VEHICLES) DrawImplosion();
-    if(stage==LEAF_WORLD_END) { DrawLightBeams(); DrawTravelArcs(); DrawWheelPlasma(); DrawFireTrails(); if(enabled && variant==3 && hookMode!=2 && !cinematicTravel.active)DonorMirrors::DrawHubcaps(Car()); }
+    if(stage==LEAF_WORLD_END) { DrawLightBeams(); DrawTravelArcs(); DrawWheelPlasma(); DrawFireTrails(); DrawImplosion(); if(enabled && variant==3 && hookMode!=2 && !cinematicTravel.active)DonorMirrors::DrawHubcaps(Car()); }
     return false;
 }
 

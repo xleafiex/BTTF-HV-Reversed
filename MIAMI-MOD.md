@@ -20,6 +20,8 @@ The current release installer installs two archives:
 
 * `C` starts the BTTF II hover conversion. On other variants it resets the console clock to the last departure.
 * `M` switches between cinematic and instant time travel.
+* `[` toggles the on-screen time-machine readout. The physical dashboard continues working.
+* The mapped exit-car control shuts down the engine on the ground. Hold the accelerator to restart a stopped engine; releasing it stops cranking.
 * `+` (top-row `=`/`+` or numpad `+`) toggles the time circuits.
 * `0`–`9` on the top row or numpad press the matching donor keypad tones.
 * Type `MMDDYYYYHHMM`, then press `-` (top-row `-` or numpad `-`) to accept a destination.
@@ -42,6 +44,14 @@ The current release installer installs two archives:
 The native module loads the donor DeLorean DFF/TXD/COL and audio, preserves the front gullwing door frames and entry animation, supports BTTF I/II/III equipment variations, side and rear hook states, Mr. Fusion and plutonium refuelling, time-circuit displays, console clock, digital and analog speed indication, reactor power/fuel behavior, wipers, windows, indicators, hazards, running/reverse/brake lighting, emergency cabin lighting, headlights, wheel conversion, hover/landing, underbody chasers, wheel plasma, wormhole and implosion effects, cinematic departure/re-entry, fire trails, blue travel sparks, frost, detached OUTATIME plate behavior, mirror views, and donor-attached engine/hover audio.
 
 The native module keeps its custom particle presets and textures inside `delorean.leaf` under `particles_additional.cfg` and `particles_additional.txd`, so stock Vice City particle definitions are not overwritten. The DeLorean package is assembled from the donor folder at install time; donor model and sound assets are not copied into the Git source tree.
+
+## Vehicle behavior batch — September 19
+
+The donor display-toggle control is available on `[`. BTTF III whitewall and horse-hook variants receive the donor sand-traction handling flag; railroad and other variants clear it. Stock exhaust particles are suppressed when the stock exhaust component is hidden, matching the donor component selection.
+
+Grounded exit-key shutdown and throttle-start control use the normal mapped controls. Low-power restart attempts now occur at 200 ms intervals instead of once per rendered frame, stop immediately on throttle release, and recover within six attempts. The success rule retains the native port's bounded recovery rather than copying the contradictory donor turnover branch. The ignition key holds its starting position during cranking and restores afterward; engine-start audio is owned by one transition handler.
+
+The cinematic implosion composites after fire trails while testing against world depth, without writing the transparent image rectangle into the depth buffer. These changes have build and offline validation; their in-game appearance and interaction still need user testing.
 
 ## Source layout
 
