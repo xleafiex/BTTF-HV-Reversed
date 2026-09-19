@@ -26,6 +26,7 @@ The current release installer installs two archives:
 * `0`–`9` on the top row or numpad press the matching donor keypad tones.
 * Type `MMDDYYYYHHMM`, then press `-` (top-row `-` or numpad `-`) to accept a destination.
 * Enter `HHMM` alone to change only the destination time, or `MMDDYYYY` alone to change only its date, then press `-`. Extra digits after a complete 12-digit entry are ignored, as in the donor.
+* Date confirmation blanks the physical destination digits for 450 ms, then restores the sections over the next 100 ms using the donor BTTF I/II or BTTF III sequence. Time-only entries leave the date display steady.
 * Hold the accelerator at 88 MPH with circuits and fuel available to trigger time travel.
 * `Tab` at the rear starts the Mr. Fusion/plutonium refuel sequence. On the side-hook variation, `Tab` at the passenger side moves the hook between its side and rear positions; `Tab` at the rear refuels when the hook is not deployed.
 * The period variation cycle is the complete selector for BTTF I, II and III equipment.

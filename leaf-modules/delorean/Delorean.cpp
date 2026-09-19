@@ -78,6 +78,8 @@ struct CinematicTravel {
 bool emergencyKeyHeld = false;
 bool leftWindowKeyHeld = false, rightWindowKeyHeld = false;
 uint32 keypadConfirmUntil = 0;
+bool destinationConfirmActive=false;
+uint32 destinationConfirmStarted=0;
 float timeCircuitShutter=0.0f;
 double timeCircuitShutterPending=0.0;
 bool autoLanding = false;
@@ -847,6 +849,7 @@ void Spawn() {
     departureTrail={};detachedPlate={};nextPlasmaParticle=0;sparkLoopActive=false;
     hoverAccelerating=false;hoverThrusterActive=false;
     emergencyLight={}; emergencyKeyHeld=false; leftWindowKeyHeld=false; rightWindowKeyHeld=false; keypadConfirmUntil=0;
+    destinationConfirmActive=false;
     underbodyLights={}; cabinShifter={}; cabinWipers={}; cabinPedals={}; cabinSignals={}; cabinWindows={};
     timeCircuitShutter=0.0f; timeCircuitShutterPending=0.0;
     consoleClock.Reset(departedTime/100,departedTime%100);
@@ -954,6 +957,22 @@ void DisplayDate(const std::string &prefix,int date,int time) {
     DisplayDigits(prefix+"min",time%100,2);
     hidden.insert(prefix+"am"); hidden.insert(prefix+"pm");
     if(circuits) hidden.erase(prefix+(time<1200?"am":"pm"));
+}
+void UpdateDestinationConfirmation() {
+    if(!destinationConfirmActive)return;
+    const unsigned elapsed=CTimer::GetTimeInMilliseconds()-destinationConfirmStarted;
+    DisplayDate("dt",destinationDate,destinationTime);
+    if(!circuits || elapsed>=550){destinationConfirmActive=false;ApplyVisibility();return;}
+    const unsigned mask=DonorSystems::DestinationBlankMask(elapsed,variant==3);
+    for(const auto &entry:frames){
+        const std::string &n=entry.first;
+        if(n.empty() || n.back()<'0' || n.back()>'9')continue;
+        if(((mask&8) && n.find("dtmonth")==0) ||
+           ((mask&4) && n.find("dtday")==0) ||
+           ((mask&2) && n.find("dtyear")==0) ||
+           ((mask&1) && (n.find("dthour")==0 || n.find("dtmin")==0)))hidden.insert(n);
+    }
+    ApplyVisibility();
 }
 void UpdateArrival(){
     if(CTimer::GetTimeInMilliseconds()<arrivalStarted)return;
@@ -2082,7 +2101,7 @@ void Update() {
     // Physics must continue while the window is unfocused; only keyboard
     // interactions are suppressed in the background.
     if(hover && !cinematicTravel.active) Fly(car);
-    if(!focused) return;
+    if(!focused) {UpdateDestinationConfirmation(); return;}
     // Original HV interaction: Tab at the rear opens/refuels the reactor.
     if(Press(VK_TAB)) {
         const CVector relative=FindPlayerCoors()-car->GetPosition();
@@ -2171,7 +2190,12 @@ void Update() {
             Help("Time circuits are OFF.");
         } else if(digits.size()==4 || digits.size()==8 || digits.size()==12) {
             int date=destinationDate,time=destinationTime;
-            if(DonorSystems::ParseDestination(digits,date,time) && DateValid(date,time)) {destinationDate=date;destinationTime=time;keypadConfirmUntil=CTimer::GetTimeInMilliseconds()+450;Sound("delorean/timecircuits/enter.wav");Help("Destination accepted."); char msg[96]; snprintf(msg,sizeof(msg),"Destination accepted: %08d %04d",date,time); Log(msg);}
+            if(DonorSystems::ParseDestination(digits,date,time) && DateValid(date,time)) {
+                destinationDate=date;destinationTime=time;
+                if(digits.size()>=8){destinationConfirmActive=true;destinationConfirmStarted=CTimer::GetTimeInMilliseconds();}
+                keypadConfirmUntil=CTimer::GetTimeInMilliseconds()+450;Sound("delorean/timecircuits/enter.wav");Help("Destination accepted.");
+                char msg[96]; snprintf(msg,sizeof(msg),"Destination accepted: %08d %04d",date,time); Log(msg);
+            }
             else { keypadConfirmUntil=CTimer::GetTimeInMilliseconds()+100; Sound("delorean/timecircuits/error.wav"); Help("Invalid date or time."); Log("Destination rejected: invalid date or time"); }
         } else { keypadConfirmUntil=CTimer::GetTimeInMilliseconds()+100; Sound("delorean/timecircuits/error.wav"); Help("Enter HHMM, MMDDYYYY or MMDDYYYYHHMM, then minus."); Log("Destination rejected: expected 4, 8 or 12 digits"); }
         digits.clear();
@@ -2195,6 +2219,7 @@ void Update() {
         // Flux lamps are maintained every update by UpdateReactorEffects.
         ApplyVisibility();
     }
+    UpdateDestinationConfirmation();
 }
 void DrawLightBeams() {
     CAutomobile *car=Car();

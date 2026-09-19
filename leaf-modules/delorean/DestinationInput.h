@@ -2,6 +2,12 @@
 #include <string>
 #include <cstdlib>
 namespace DonorSystems {
+// Flash.txt: bits blank time, year, day and month respectively.
+inline unsigned DestinationBlankMask(unsigned elapsed,bool hoodBox) {
+    if(elapsed<450)return 15;
+    if(elapsed>=550)return 0;
+    return hoodBox?(elapsed<500?7:3):8;
+}
 inline bool ParseDestination(const std::string &digits,int &date,int &time) {
     if(digits.size()!=4 && digits.size()!=8 && digits.size()!=12)return false;
     for(char c:digits)if(c<'0' || c>'9')return false;
