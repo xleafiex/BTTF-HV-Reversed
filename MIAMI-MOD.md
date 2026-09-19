@@ -44,6 +44,8 @@ The current release installer installs two archives:
 
 ### Vehicle features included so far
 
+BTTF III hoodbox variants now use independent donor coil-segment flicker at 50 ms intervals while charging below 47 m/s (about 86 MPH), settling into steady segment-four illumination above that speed. BTTF I/II retain steady coils.
+
 An unattended hovering DeLorean begins automatic landing within five metres of the ground. On-foot controls no longer steer or accelerate it; altitude stabilization continues when focus is lost. Upside-down damage protection applies during hover conversion/flight and ends when landing conversion finishes. Hover-idle audio remains suppressed throughout cinematic travel.
 
 The present calendar advances when the game clock passes midnight, including month/year changes and Gregorian leap years. Travel rebases the calendar to the selected destination so a backwards clock jump does not add an extra day. Destination and last-departed dates remain fixed. The four-digit year display caps the calendar at December 31, 9999.

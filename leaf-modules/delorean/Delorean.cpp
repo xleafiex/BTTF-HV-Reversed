@@ -111,6 +111,8 @@ float hookMotion = 0.0f;
 bool hookAnimating = false;
 bool hookDoorReserved = false;
 float fluxCabinAlpha=0;
+int hoodCoilSegments[3]={4,4,4};
+uint32 nextHoodCoilFlicker=0;
 int sidLevels[10]={};
 double sidPending=0;
 float hookFlexPitch=0, hookFlexRoll=0, hookFlexPitchSpeed=0, hookFlexRollSpeed=0;
@@ -1575,12 +1577,25 @@ void UpdateTemporalEffects(CAutomobile *car) {
             wormholeFrame=(int)Bound(float(wormholeFrame),1,70);
         }
     }
-    // Normal donor configuration uses coil segment four; other segments
-    // belong to the hoodbox flicker sequence and stay hidden in BTTF I/II.
+    // Coils.txt: hoodbox variants choose each bank independently every 50 ms.
+    // The donor maps random values 5->1 and 6->3, favouring those segments;
+    // zero blanks a bank. Above 47 m/s all banks settle on segment four.
+    const bool hoodFlicker=variant==3 && circuits && coilAlpha>0 && speed<=47.0f;
+    if(hoodFlicker && now>=nextHoodCoilFlicker){
+        nextHoodCoilFlicker=now+50;
+        for(int &segment:hoodCoilSegments){
+            segment=rand()%7;
+            if(segment==5)segment=1;
+            else if(segment==6)segment=3;
+        }
+    }
+    int bank=0;
     for(const char *prefix:{"fluxcoilsonlb","fluxcoilsonrb","fluxcoilsonf"}) {
+        const int selected=hoodFlicker?hoodCoilSegments[bank]:4;
+        ++bank;
         for(int i=1;i<=5;i++) {
             const std::string name=std::string(prefix)+std::to_string(i);
-            if(i==4 && coilAlpha>0) hidden.erase(name); else hidden.insert(name);
+            if(i==selected && coilAlpha>0) hidden.erase(name); else hidden.insert(name);
         }
     }
     if(coilAlpha>0) hidden.erase("fluxemitteron"); else hidden.insert("fluxemitteron");
