@@ -801,6 +801,7 @@ void Variation() {
 #include "FrostShader.h"
 #include "CabinDetail.h"
 #include "TravelArcs.h"
+#include "HoodboxEffects.h"
 #include "Plasma.h"
 #include "FireTrails.h"
 RpAtomic *RememberCabinEmitter(RpAtomic *,void *);
@@ -2139,6 +2140,7 @@ void Update() {
     UpdateDepartureTrail();
     UpdateDetachedPlate(car);
     UpdateTemporalEffects(car);
+    UpdateHoodboxEffects(car);
     UpdateDashboard(car);
     UpdateCabin(car,focused);
     // Dashboard animation runs first; the held starting-key pose wins while
@@ -2597,7 +2599,7 @@ extern "C" __declspec(dllexport) bool LeafIsFireTrailPreviewActive() {return pre
 extern "C" __declspec(dllexport) bool LeafRenderPass(uint32_t stage) {
     if(stage==LEAF_PRE_RENDER && enabled && Car()) { UpdateLightBeams(Car()); DonorMirrors::Update(Car(),variant==3 && hookMode!=2 && !cinematicTravel.active); }
     if(stage==LEAF_BEFORE_VEHICLES) DrawWormhole();
-    if(stage==LEAF_WORLD_END) { DrawLightBeams(); DrawTravelArcs(); DrawWheelPlasma(); DrawFireTrails(); DrawImplosion(); if(enabled && variant==3 && hookMode!=2 && !cinematicTravel.active)DonorMirrors::DrawHubcaps(Car()); }
+    if(stage==LEAF_WORLD_END) { DrawLightBeams(); DrawTravelArcs(); DrawHoodboxEffects(); DrawWheelPlasma(); DrawFireTrails(); DrawImplosion(); if(enabled && variant==3 && hookMode!=2 && !cinematicTravel.active)DonorMirrors::DrawHubcaps(Car()); }
     return false;
 }
 
