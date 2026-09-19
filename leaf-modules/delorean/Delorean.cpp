@@ -80,6 +80,8 @@ bool leftWindowKeyHeld = false, rightWindowKeyHeld = false;
 uint32 keypadConfirmUntil = 0;
 bool destinationConfirmActive=false;
 uint32 destinationConfirmStarted=0;
+bool displayStartupActive=false;
+uint32 displayStartupStarted=0;
 float timeCircuitShutter=0.0f;
 double timeCircuitShutterPending=0.0;
 bool autoLanding = false;
@@ -850,6 +852,7 @@ void Spawn() {
     hoverAccelerating=false;hoverThrusterActive=false;
     emergencyLight={}; emergencyKeyHeld=false; leftWindowKeyHeld=false; rightWindowKeyHeld=false; keypadConfirmUntil=0;
     destinationConfirmActive=false;
+    displayStartupActive=false;
     underbodyLights={}; cabinShifter={}; cabinWipers={}; cabinPedals={}; cabinSignals={}; cabinWindows={};
     timeCircuitShutter=0.0f; timeCircuitShutterPending=0.0;
     consoleClock.Reset(departedTime/100,departedTime%100);
@@ -959,7 +962,29 @@ void DisplayDate(const std::string &prefix,int date,int time) {
     if(circuits) hidden.erase(prefix+(time<1200?"am":"pm"));
 }
 void UpdateDestinationConfirmation() {
-    if(!destinationConfirmActive)return;
+    if(displayStartupActive){
+        const unsigned age=CTimer::GetTimeInMilliseconds()-displayStartupStarted;
+        DisplayDate("dt",destinationDate,destinationTime);
+        DisplayDate("pt",presentDate,CClock::GetHours()*100+CClock::GetMinutes());
+        DisplayDate("ltd",departedDate,departedTime);
+        if(!circuits || age>=550)displayStartupActive=false;
+        else {
+            // On.txt uses the same section order as Flash.txt for all three
+            // rows: blank, partial illumination, then fully powered digits.
+            const unsigned mask=DonorSystems::DestinationBlankMask(age,variant==3);
+            for(const char *row:{"dt","pt","ltd"})for(const auto &entry:frames){
+                const std::string &n=entry.first;
+                if(n.empty() || n.back()<'0' || n.back()>'9')continue;
+                const std::string prefix=row;
+                if(((mask&8) && n.find(prefix+"month")==0) ||
+                   ((mask&4) && n.find(prefix+"day")==0) ||
+                   ((mask&2) && n.find(prefix+"year")==0) ||
+                   ((mask&1) && (n.find(prefix+"hour")==0 || n.find(prefix+"min")==0)))hidden.insert(n);
+            }
+        }
+        ApplyVisibility();
+    }
+    if(!destinationConfirmActive || displayStartupActive)return;
     const unsigned elapsed=CTimer::GetTimeInMilliseconds()-destinationConfirmStarted;
     DisplayDate("dt",destinationDate,destinationTime);
     if(!circuits || elapsed>=550){destinationConfirmActive=false;ApplyVisibility();return;}
@@ -2134,6 +2159,9 @@ void Update() {
     // immediately gates the display, flux animation, and time-travel trigger.
     if(Press(VK_ADD) || Press(VK_OEM_PLUS)) {
         circuits=!circuits;
+        displayStartupActive=true;
+        displayStartupStarted=CTimer::GetTimeInMilliseconds();
+        destinationConfirmActive=false;
         Sound(circuits ? "delorean/timecircuits/on.wav" : "delorean/timecircuits/off.wav");
         Help(circuits ? "Time circuits ON." : "Time circuits OFF.");
         Log(circuits ? "Time circuits enabled" : "Time circuits disabled");

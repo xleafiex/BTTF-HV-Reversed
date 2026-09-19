@@ -23,6 +23,7 @@ The current release installer installs two archives:
 * `[` toggles the on-screen time-machine readout. The physical dashboard continues working.
 * The mapped exit-car control shuts down the engine on the ground. Hold the accelerator to restart a stopped engine; releasing it stops cranking.
 * `+` (top-row `=`/`+` or numpad `+`) toggles the time circuits.
+* Power-on now stages all three physical time-display rows over 550 ms using the donor section order; BTTF III restores the month and day first. Switching off cancels the sequence immediately.
 * `0`–`9` on the top row or numpad press the matching donor keypad tones.
 * Type `MMDDYYYYHHMM`, then press `-` (top-row `-` or numpad `-`) to accept a destination.
 * Enter `HHMM` alone to change only the destination time, or `MMDDYYYY` alone to change only its date, then press `-`. Extra digits after a complete 12-digit entry are ignored, as in the donor.
