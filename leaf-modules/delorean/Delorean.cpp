@@ -49,6 +49,7 @@
 #include "DonorSystems.h"
 #include "IgnitionCycle.h"
 #include "DestinationInput.h"
+#include "TravelCalendar.h"
 #include "DonorAudio.h"
 #include "DonorCabin.h"
 #include "DonorLegPose.h"
@@ -66,6 +67,7 @@ bool enabled = false, changedModel = false, circuits = true, fuel = true, hover 
 bool boostActive = false;
 bool instantTravelMode = false;
 bool travelHudVisible = true;
+DonorSystems::TravelCalendar travelCalendar;
 DonorSystems::IgnitionCycle ignitionCycle;
 struct CinematicTravel {
     bool active=false, vanished=false, fading=false, reentered=false, revealed=false;
@@ -935,8 +937,7 @@ void Fly(CAutomobile *car) {
 bool DateValid(int date, int time) {
     int year=date/10000, month=(date/100)%100, day=date%100;
     if (year<1 || year>9999 || month<1 || month>12 || time<0 || time/100>23 || time%100>59) return false;
-    const int days[]={31,28,31,30,31,30,31,31,30,31,30,31};
-    int n=days[month-1]+(month==2 && year%4==0 && (year%100!=0 || year%400==0));
+    int n=DonorSystems::DaysInMonth(year,month);
     return day>=1 && day<=n;
 }
 void DisplayDigits(const std::string &prefix, int value, int count) {
@@ -1251,6 +1252,7 @@ void Travel(CAutomobile *car,bool departure=true,bool travelSound=true,uint32 ar
     arrival.Begin(presentDate,destinationDate);arrivalStarted=CTimer::GetTimeInMilliseconds()+arrivalDelay;arrivalPosition=car->GetPosition();
     UpdateArrival();
     presentDate=destinationDate; CClock::SetGameClock(destinationTime/100,destinationTime%100);
+    travelCalendar.Rebase(CClock::GetHours());
     fuel=false; lowPower=true; startAttempts=0;
     if(cinematicTravel.active){emptyFlashUntil=0;emptyAudioActive=false;emptyAudioPhase=-1;}
     stallDeadline=CTimer::GetTimeInMilliseconds()+5000+(rand()%15001);
@@ -1842,7 +1844,7 @@ void UpdateCabin(CAutomobile *car,bool focused) {
     const double dt=CTimer::GetTimeStepInSeconds();
     const bool occupied=FindPlayerVehicle()==car;
     const uint32 keypadNow=CTimer::GetTimeInMilliseconds();
-    auto held=[&](int key){return focused && occupied && (GetAsyncKeyState(key)&0x8000)!=0;};
+    auto held=[&](int key){return focused && occupied && !cinematicTravel.active && (GetAsyncKeyState(key)&0x8000)!=0;};
     // Donor Keypad.txt moves each numbered key while either binding is held.
     for(int i=0;i<10;++i){
         const std::string frame="tcdkeypadbutton"+std::to_string(i);
@@ -2044,6 +2046,7 @@ void Update() {
         audioCar?&audioCar->GetRight().x:nil,audioCar?&audioCar->GetForward().x:nil,audioCar?&audioCar->GetUp().x:nil);
     if(!FindPlayerPed()) {CancelRefuel();return;}
     if(paused) return;
+    presentDate=travelCalendar.Update(presentDate,CClock::GetHours());
     UpdateHookDrops(CTimer::GetTimeStepInSeconds());
     DWORD pid=0; GetWindowThreadProcessId(GetForegroundWindow(),&pid);
     const bool focused=pid==GetCurrentProcessId();
@@ -2126,7 +2129,12 @@ void Update() {
     // Physics must continue while the window is unfocused; only keyboard
     // interactions are suppressed in the background.
     if(hover && !cinematicTravel.active) Fly(car);
-    if(!focused) {UpdateDestinationConfirmation(); return;}
+    if(!focused || cinematicTravel.active) {
+        // Consume key edges while input is unavailable. Holding a number,
+        // plus or minus through arrival must not queue a cockpit action.
+        for(int key=0;key<256;++key)keys[key]=(GetAsyncKeyState(key)&0x8000)!=0;
+        UpdateDestinationConfirmation(); return;
+    }
     // Original HV interaction: Tab at the rear opens/refuels the reactor.
     if(Press(VK_TAB)) {
         const CVector relative=FindPlayerCoors()-car->GetPosition();

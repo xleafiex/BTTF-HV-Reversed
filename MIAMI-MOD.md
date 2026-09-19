@@ -44,6 +44,10 @@ The current release installer installs two archives:
 
 ### Vehicle features included so far
 
+The present calendar advances when the game clock passes midnight, including month/year changes and Gregorian leap years. Travel rebases the calendar to the selected destination so a backwards clock jump does not add an extra day. Destination and last-departed dates remain fixed. The four-digit year display caps the calendar at December 31, 9999.
+
+Time-circuit key presses during cinematic travel or while unfocused are consumed rather than queued for arrival. Cabin keyboard animations are suspended during cinematic travel.
+
 The native module loads the donor DeLorean DFF/TXD/COL and audio, preserves the front gullwing door frames and entry animation, supports BTTF I/II/III equipment variations, side and rear hook states, Mr. Fusion and plutonium refuelling, time-circuit displays, console clock, digital and analog speed indication, reactor power/fuel behavior, wipers, windows, indicators, hazards, running/reverse/brake lighting, emergency cabin lighting, headlights, wheel conversion, hover/landing, underbody chasers, wheel plasma, wormhole and implosion effects, cinematic departure/re-entry, fire trails, blue travel sparks, frost, detached OUTATIME plate behavior, mirror views, and donor-attached engine/hover audio.
 
 The native module keeps its custom particle presets and textures inside `delorean.leaf` under `particles_additional.cfg` and `particles_additional.txd`, so stock Vice City particle definitions are not overwritten. The DeLorean package is assembled from the donor folder at install time; donor model and sound assets are not copied into the Git source tree.
