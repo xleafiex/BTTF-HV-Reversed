@@ -2347,7 +2347,8 @@ void DrawImplosion() {
     // implosion instead of compositing over its bright core. Re-entry keeps
     // the old transparent behavior so the returning car remains visible.
     const bool implosionOccluder=cinematicTravel.active && cinematicTravel.vanished && !cinematicTravel.revealed;
-    RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,(void*)(implosionOccluder?TRUE:FALSE));
+    RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,
+        reinterpret_cast<void *>(static_cast<uintptr_t>(implosionOccluder?TRUE:FALSE)));
     RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE,(void*)TRUE);
     RwRenderStateSet(rwRENDERSTATESRCBLEND,(void*)rwBLENDSRCALPHA);RwRenderStateSet(rwRENDERSTATEDESTBLEND,(void*)rwBLENDINVSRCALPHA);
     RwRenderStateSet(rwRENDERSTATEFOGENABLE,(void*)FALSE);RwRenderStateSet(rwRENDERSTATECULLMODE,(void*)rwCULLMODECULLNONE);
