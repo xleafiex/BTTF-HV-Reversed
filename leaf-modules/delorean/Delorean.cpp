@@ -48,6 +48,7 @@
 #include "ArrivalSequence.h"
 #include "DonorSystems.h"
 #include "IgnitionCycle.h"
+#include "DestinationInput.h"
 #include "DonorAudio.h"
 #include "DonorCabin.h"
 #include "DonorLegPose.h"
@@ -2159,7 +2160,7 @@ void Update() {
         }
     }
     for(int i=0;i<10;++i) if(circuits && (Press('0'+i) | Press(VK_NUMPAD0+i))) {
-        if(digits.size()>=12) digits.clear(); digits.push_back('0'+i);
+        if(digits.size()<12) digits.push_back('0'+i);
         char keypadSound[16];
         // Donor opcode 3F90 maps each number directly to bttfhv/sound/N.wav.
         snprintf(keypadSound,sizeof(keypadSound),"%d.wav",i);
@@ -2168,12 +2169,11 @@ void Update() {
     if(Press(VK_SUBTRACT) | Press(VK_OEM_MINUS)) {
         if(!circuits) {
             Help("Time circuits are OFF.");
-        } else if(digits.size()==12) {
-            int month=atoi(digits.substr(0,2).c_str()),day=atoi(digits.substr(2,2).c_str()),year=atoi(digits.substr(4,4).c_str());
-            int date=year*10000+month*100+day,time=atoi(digits.substr(8,4).c_str());
-            if(DateValid(date,time)) {destinationDate=date;destinationTime=time;keypadConfirmUntil=CTimer::GetTimeInMilliseconds()+450;Sound("delorean/timecircuits/enter.wav");Help("Destination accepted."); char msg[96]; snprintf(msg,sizeof(msg),"Destination accepted: %08d %04d",date,time); Log(msg);}
+        } else if(digits.size()==4 || digits.size()==8 || digits.size()==12) {
+            int date=destinationDate,time=destinationTime;
+            if(DonorSystems::ParseDestination(digits,date,time) && DateValid(date,time)) {destinationDate=date;destinationTime=time;keypadConfirmUntil=CTimer::GetTimeInMilliseconds()+450;Sound("delorean/timecircuits/enter.wav");Help("Destination accepted."); char msg[96]; snprintf(msg,sizeof(msg),"Destination accepted: %08d %04d",date,time); Log(msg);}
             else { keypadConfirmUntil=CTimer::GetTimeInMilliseconds()+100; Sound("delorean/timecircuits/error.wav"); Help("Invalid date or time."); Log("Destination rejected: invalid date or time"); }
-        } else { keypadConfirmUntil=CTimer::GetTimeInMilliseconds()+100; Sound("delorean/timecircuits/error.wav"); Help("Enter MMDDYYYYHHMM, then minus."); Log("Destination rejected: expected MMDDYYYYHHMM"); }
+        } else { keypadConfirmUntil=CTimer::GetTimeInMilliseconds()+100; Sound("delorean/timecircuits/error.wav"); Help("Enter HHMM, MMDDYYYY or MMDDYYYYHHMM, then minus."); Log("Destination rejected: expected 4, 8 or 12 digits"); }
         digits.clear();
     }
     uint32 now=CTimer::GetTimeInMilliseconds();
