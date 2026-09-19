@@ -2341,7 +2341,13 @@ void DrawImplosion() {
     const uint32 alphaFunc=rw::GetRenderState(rw::ALPHATESTFUNC);
     rw::SetRenderState(rw::ALPHATESTFUNC,rw::ALPHAALWAYS);
     RwRenderStateSet(rwRENDERSTATETEXTURERASTER,RwTextureGetRaster(texture));
-    RwRenderStateSet(rwRENDERSTATEZTESTENABLE,(void*)TRUE);RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,(void*)FALSE);
+    RwRenderStateSet(rwRENDERSTATEZTESTENABLE,(void*)TRUE);
+    // During departure the car is hidden and the implosion is the foreground
+    // volume. Writing its depth keeps later fire-trail passes behind the
+    // implosion instead of compositing over its bright core. Re-entry keeps
+    // the old transparent behavior so the returning car remains visible.
+    const bool implosionOccluder=cinematicTravel.active && cinematicTravel.vanished && !cinematicTravel.revealed;
+    RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,(void*)(implosionOccluder?TRUE:FALSE));
     RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE,(void*)TRUE);
     RwRenderStateSet(rwRENDERSTATESRCBLEND,(void*)rwBLENDSRCALPHA);RwRenderStateSet(rwRENDERSTATEDESTBLEND,(void*)rwBLENDINVSRCALPHA);
     RwRenderStateSet(rwRENDERSTATEFOGENABLE,(void*)FALSE);RwRenderStateSet(rwRENDERSTATECULLMODE,(void*)rwCULLMODECULLNONE);
